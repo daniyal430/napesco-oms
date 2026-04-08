@@ -28,7 +28,16 @@
 <body>
 <div id="root"></div>
 <script type="text/babel">
-const { useState, useContext, createContext } = React;
+const { useState, useEffect, useContext, createContext } = React;
+
+// ─── LOCAL STORAGE PERSISTENCE ──────────────────────────────
+const STORAGE_KEY = 'napesco_oms_data';
+const loadSaved = () => { try { const d = localStorage.getItem(STORAGE_KEY); return d ? JSON.parse(d) : null; } catch(e) { return null; } };
+const usePersist = (key, init) => {
+  const saved = loadSaved();
+  const [val, setVal] = useState(saved && saved[key] !== undefined ? saved[key] : init);
+  return [val, setVal, key];
+};
 
 // ─── TRANSLATIONS ────────────────────────────────────────────
 const T = {
@@ -184,7 +193,7 @@ const Badge = ({s}) => {
 };
 
 // ─── SIDEBAR ────────────────────────────────────────────────
-const Sidebar = ({page, setPage, lang, setLang}) => {
+const Sidebar = ({page, setPage, lang, setLang, resetData}) => {
   const t = T[lang];
   const navItems = [
     {key:'dashboard', icon:'📊'},
@@ -212,9 +221,12 @@ const Sidebar = ({page, setPage, lang, setLang}) => {
         ))}
       </nav>
       <div style={{borderTop:'1px solid rgba(255,255,255,0.1)', paddingTop:'20px'}}>
-        <button onClick={()=>setLang(lang==='en'?'ar':'en')} className="w-full px-4 py-2 bg-white text-slate-800 rounded-lg font-medium text-sm hover:bg-gray-100">
+        <button onClick={()=>setLang(lang==='en'?'ar':'en')} className="w-full px-4 py-2 bg-white text-slate-800 rounded-lg font-medium text-sm hover:bg-gray-100 mb-2">
           {lang === 'en' ? 'عربي' : 'English'}
         </button>
+        {resetData && <button onClick={resetData} className="w-full px-4 py-2 text-xs text-gray-400 hover:text-red-400 rounded-lg font-medium" style={{background:'transparent',border:'1px solid rgba(255,255,255,0.1)'}}>
+          Reset Data
+        </button>}
       </div>
     </aside>
   );
@@ -1930,22 +1942,40 @@ const AssetManagement = () => {
 
 // ─── APP ROOT ─────────────────────────────────────────────────
 const App = () => {
-  const [lang, setLang] = useState('en');
+  const saved = loadSaved();
+  const [lang, setLang] = useState(saved?.lang || 'en');
   const [page, setPage] = useState('dashboard');
-  const [jobs, setJobs] = useState(initJobs);
-  const [assets, setAssets] = useState(initAssets);
-  const [wells, setWells] = useState(initWells);
-  const [clients, setClients] = useState(initClients);
-  const [tickets, setTickets] = useState(initTickets);
-  const [backloads, setBackloads] = useState(initBackloads);
-  const [inspections, setInspections] = useState(initInspections);
-  const [workOrders, setWorkOrders] = useState(initWorkOrders);
-  const [quotes, setQuotes] = useState(initQuotes);
-  const [invoices, setInvoices] = useState(initInvoices);
-  const [approvals, setApprovals] = useState(initApprovals);
-  const [users, setUsers] = useState(initUsers);
+  const [jobs, setJobs] = useState(saved?.jobs || initJobs);
+  const [assets, setAssets] = useState(saved?.assets || initAssets);
+  const [wells, setWells] = useState(saved?.wells || initWells);
+  const [clients, setClients] = useState(saved?.clients || initClients);
+  const [tickets, setTickets] = useState(saved?.tickets || initTickets);
+  const [backloads, setBackloads] = useState(saved?.backloads || initBackloads);
+  const [inspections, setInspections] = useState(saved?.inspections || initInspections);
+  const [workOrders, setWorkOrders] = useState(saved?.workOrders || initWorkOrders);
+  const [quotes, setQuotes] = useState(saved?.quotes || initQuotes);
+  const [invoices, setInvoices] = useState(saved?.invoices || initInvoices);
+  const [approvals, setApprovals] = useState(saved?.approvals || initApprovals);
+  const [users, setUsers] = useState(saved?.users || initUsers);
 
-  const ctx = {lang, page, setPage, jobs, setJobs, assets, setAssets, wells, setWells, clients, setClients, tickets, setTickets, backloads, setBackloads, inspections, setInspections, workOrders, setWorkOrders, quotes, setQuotes, invoices, setInvoices, approvals, setApprovals, users, setUsers};
+  // Auto-save all data to localStorage whenever anything changes
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        lang, jobs, assets, wells, clients, tickets, backloads,
+        inspections, workOrders, quotes, invoices, approvals, users
+      }));
+    } catch(e) { console.warn('Failed to save data:', e); }
+  }, [lang, jobs, assets, wells, clients, tickets, backloads, inspections, workOrders, quotes, invoices, approvals, users]);
+
+  const resetData = () => {
+    if(confirm('Reset all data to defaults? This cannot be undone.')) {
+      localStorage.removeItem(STORAGE_KEY);
+      location.reload();
+    }
+  };
+
+  const ctx = {lang, page, setPage, jobs, setJobs, assets, setAssets, wells, setWells, clients, setClients, tickets, setTickets, backloads, setBackloads, inspections, setInspections, workOrders, setWorkOrders, quotes, setQuotes, invoices, setInvoices, approvals, setApprovals, users, setUsers, resetData};
 
   const pages = {dashboard:Dashboard, jobs:Jobs, serviceDelivery:ServiceDelivery, backload:Backload, assets:Assets, inspection:Inspection, maintenance:Maintenance, q2c:Q2C, kpi:KPI, governance:Governance, users:UserManagement, assetMgmt:AssetManagement};
   const Page = pages[page] || Dashboard;
@@ -1953,7 +1983,7 @@ const App = () => {
   return (
     <Ctx.Provider value={ctx}>
       <div dir={lang==='ar'?'rtl':'ltr'} style={{display:'flex', minHeight:'100vh'}}>
-        <Sidebar page={page} setPage={setPage} lang={lang} setLang={setLang}/>
+        <Sidebar page={page} setPage={setPage} lang={lang} setLang={setLang} resetData={resetData}/>
         <main style={{flex:1, padding:'24px', overflowY:'auto'}}>
           <Page/>
         </main>
