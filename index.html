@@ -1,0 +1,1968 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NAPESCO Operations Management System</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: Arial, sans-serif; background: #f1f5f9; }
+    [dir="rtl"] { font-family: Arial, 'Segoe UI', sans-serif; }
+    .sidebar-item { transition: background 0.15s; cursor: pointer; }
+    .sidebar-item:hover { background: rgba(255,255,255,0.08); }
+    .sidebar-item.active { background: rgba(255,255,255,0.15); border-right: 3px solid #f59e0b; }
+    [dir="rtl"] .sidebar-item.active { border-right: none; border-left: 3px solid #f59e0b; }
+    .badge { display: inline-flex; align-items: center; padding: 2px 9px; border-radius: 999px; font-size: 11px; font-weight: 600; }
+    .card { background: white; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); padding: 20px; }
+    .tr-hover:hover { background: #f8fafc; cursor: pointer; }
+    .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 100; display: flex; align-items: center; justify-content: center; }
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+    @media print { .no-print { display: none !important; } body { background: white; } .card { box-shadow: none; border: 1px solid #e2e8f0; } }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useContext, createContext } = React;
+
+// ─── TRANSLATIONS ────────────────────────────────────────────
+const T = {
+  en: {
+    appName:'NAPESCO OMS', dashboard:'Dashboard', jobs:'Jobs', serviceDelivery:'Service Delivery',
+    backload:'Backload Management', assets:'Assets', inspection:'Inspection', maintenance:'Maintenance',
+    q2c:'Quote to Cash', kpi:'KPI Dashboard', governance:'Governance', users:'User Management',
+    assetMgmt:'Asset Management', createJob:'Create Job', createTicket:'Create Dispatch',
+    createBackload:'Create Backload', createInspection:'Create Inspection', createWorkOrder:'Create Work Order',
+    createUser:'Create User', addAsset:'Add Asset', noData:'No data',
+    cancel:'Cancel', save:'Save', delete:'Delete', edit:'Edit', approve:'Approve', reject:'Reject',
+    active:'Active', inactive:'Inactive', exportExcel:'Export Excel', exportPDF:'Export PDF',
+  },
+  ar: {
+    appName:'نظام إدارة عمليات ناپسكو', dashboard:'لوحة التحكم', jobs:'المشاريع', serviceDelivery:'تسليم الخدمة',
+    backload:'إدارة الحمل الزائد', assets:'الأصول', inspection:'التفتيش', maintenance:'الصيانة',
+    q2c:'من عرض السعر للدفع', kpi:'لوحة مؤشرات الأداء', governance:'الحوكمة', users:'إدارة المستخدمين',
+    assetMgmt:'إدارة الأصول', createJob:'إنشاء مشروع', createTicket:'إنشاء شحنة',
+    createBackload:'إنشاء حمل زائد', createInspection:'إنشاء تفتيش', createWorkOrder:'إنشاء أمر عمل',
+    createUser:'إنشاء مستخدم', addAsset:'إضافة أصل', noData:'لا توجد بيانات',
+    cancel:'إلغاء', save:'حفظ', delete:'حذف', edit:'تحرير', approve:'موافقة', reject:'رفض',
+    active:'نشط', inactive:'غير نشط', exportExcel:'تصدير إلى Excel', exportPDF:'تصدير إلى PDF',
+  }
+};
+
+// ─── CONTEXT ────────────────────────────────────────────────
+const Ctx = createContext(null);
+
+// ─── INITIAL DATA ─────────────────────────────────────────────
+const initAssets = [
+  {id:'A001',serial:'SN-2024-001',type:'Mud Cleaner',productLine:'PC500',status:'In Job',runs:145,hours:2340,nextMaintAt:'2024-06-15',active:true,assignedTo:'Saudi Aramco',history:[{date:'2024-03-01',event:'Dispatched to job',jobNumber:'JP-2026-001',client:'Saudi Aramco',details:'Service delivery manifest MNF-2024-001'}]},
+  {id:'A002',serial:'SN-2024-002',type:'Centrifuge',productLine:'RF200',status:'Available',runs:89,hours:1560,nextMaintAt:'2024-07-20',active:true,assignedTo:null,history:[]},
+  {id:'A003',serial:'SN-2024-003',type:'Shale Shaker',productLine:'SS-250',status:'Redress',runs:156,hours:2890,nextMaintAt:'2024-05-10',active:true,assignedTo:null,history:[]},
+  {id:'A004',serial:'SN-2024-004',type:'Solids Control',productLine:'SC-400',status:'Available',runs:102,hours:1750,nextMaintAt:'2024-06-30',active:true,assignedTo:null,history:[]},
+  {id:'A005',serial:'SN-2024-005',type:'Mud Tank',productLine:'MT-100',status:'In Job',runs:67,hours:890,nextMaintAt:'2024-08-15',active:true,assignedTo:'Saudi Aramco',history:[{date:'2024-03-01',event:'Dispatched to job',jobNumber:'JP-2026-001',client:'Saudi Aramco',details:'Service delivery manifest MNF-2024-001'}]},
+  {id:'A006',serial:'SN-2024-006',type:'Chiller Unit',productLine:'CU-50',status:'Quarantine',runs:201,hours:3450,nextMaintAt:'2024-04-20',active:true,assignedTo:null,history:[]},
+];
+
+const initJobs = [
+  {id:'J001',jobNumber:'JP-2026-001',well:'Safaniyah-2A',client:'Saudi Aramco',status:'Service Delivered',startDate:'2024-03-01',estComplDate:'2024-06-30',nptEvents:[{reason:'Equipment failure',hours:2.5},{reason:'Weather delay',hours:1.5}]},
+  {id:'J002',jobNumber:'JP-2026-002',well:'Qatif-5B',client:'Saudi Aramco',status:'Created',startDate:'2024-04-10',estComplDate:'2024-07-15',nptEvents:[]},
+  {id:'J003',jobNumber:'JP-2026-003',well:'Safaniyah-3C',client:'Saudi Aramco',status:'Closed',startDate:'2024-01-15',estComplDate:'2024-03-30',nptEvents:[{reason:'Tool replacement',hours:0.75}]},
+];
+
+const initWells = ['Safaniyah-2A', 'Qatif-5B', 'Safaniyah-3C', 'Khurais-1A', 'Ghawar-7D', 'Berri-4C'];
+const initClients = ['Saudi Aramco', 'ADNOC', 'Kuwait Oil Company', 'Qatar Energy', 'Bahrain Petroleum'];
+
+const initTickets = [{id:'TK001',jobId:'J001',manifest:'MNF-2024-001',deliveredTools:['A001','A004'],deliveryDate:'2024-03-01',deliveryConfirmed:true,status:'Delivered'}];
+const initBackloads = [{id:'BL001',jobId:'J001',ticketId:'TK001',status:'Received',tools:[{serial:'SN-2024-001',condition:'OK',notes:''}],submittedDate:'2024-03-05',receivedDate:'2024-03-05',receivedBy:'Yard Supervisor'}];
+const initInspections = [{id:'I001',toolId:'A001',serial:'SN-2024-001',inspectorName:'Ahmed Al-Rashid',result:'Accept',date:'2024-03-10',notes:'Passed all checks'}];
+const initWorkOrders = [{id:'WO001',toolId:'A003',serial:'SN-2024-003',type:'Redress',status:'Open',createdDate:'2024-03-15',assignedTo:'Workshop Team',notes:'Bearing replacement needed'}];
+const initQuotes = [{id:'Q001',jobId:'J001',client:'Saudi Aramco',contract:'CTR-2024-001',total:450000,status:'Approved',createdDate:'2024-03-15'}];
+const initInvoices = [{id:'INV001',jobId:'J001',quoteId:'Q001',client:'Saudi Aramco',amount:450000,status:'Paid',issuedDate:'2024-03-20',dueDate:'2024-04-20'}];
+const initApprovals = [{id:'AP001',type:'Tool Purchase',description:'Authorization for new mud cleaner',risk:'Medium',status:'Pending',requestedBy:'Operations Manager',requestedDate:'2024-03-18',jobRef:'JP-2026-001'}];
+
+const initUsers = [
+  {id:'U001',name:'Ahmed Al-Rashid',email:'ahmed@napesco.com',role:'Admin',status:'Active',pageAccess:['dashboard','jobs','serviceDelivery','backload','assets','inspection','maintenance','q2c','kpi','governance','users','assetMgmt']},
+  {id:'U002',name:'Fatima Al-Dosari',email:'fatima@napesco.com',role:'Manager',status:'Active',pageAccess:['dashboard','jobs','serviceDelivery','backload','assets','inspection','maintenance','q2c','kpi','governance']},
+  {id:'U003',name:'Mohammed Al-Shammari',email:'mohammed@napesco.com',role:'Engineer',status:'Active',pageAccess:['dashboard','jobs','serviceDelivery','assets','inspection','maintenance','q2c']},
+  {id:'U004',name:'Layla Al-Mutairi',email:'layla@napesco.com',role:'Engineer',status:'Active',pageAccess:['dashboard','jobs','assets','serviceDelivery']},
+  {id:'U005',name:'Khalid Al-Nasser',email:'khalid@napesco.com',role:'Viewer',status:'Inactive',pageAccess:['dashboard','jobs','assets']},
+  {id:'U006',name:'Sara Al-Zahrani',email:'sara@napesco.com',role:'Manager',status:'Active',pageAccess:['dashboard','jobs','backload','inspection','q2c','governance']},
+];
+
+// ─── EXPORT BAR COMPONENT ────────────────────────────────────
+const ExportBar = ({title, data}) => {
+  const exportToExcel = () => {
+    let csv = '';
+    if(Array.isArray(data) && data.length > 0) {
+      const keys = Object.keys(data[0]);
+      csv = keys.join(',') + '\n';
+      data.forEach(row => {
+        csv += keys.map(k => {
+          const val = row[k];
+          if(Array.isArray(val) || (typeof val === 'object' && val !== null)) return '"' + JSON.stringify(val) + '"';
+          return typeof val === 'string' && val.includes(',') ? '"' + val + '"' : val;
+        }).join(',') + '\n';
+      });
+    }
+    const blob = new Blob([csv], {type: 'text/csv;charset=utf-8;'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${title}-${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const exportToPDF = () => {
+    window.print();
+  };
+
+  return (
+    <div className="flex gap-2 no-print">
+      <button onClick={exportToExcel} className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50 font-medium">
+        📊 Export Excel
+      </button>
+      <button onClick={exportToPDF} className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50 font-medium">
+        📄 Export PDF
+      </button>
+    </div>
+  );
+};
+
+// ─── MODAL COMPONENT ────────────────────────────────────────
+const Modal = ({title, children, onClose, size='md'}) => {
+  const sizes = {sm:'max-w-sm', md:'max-w-md', lg:'max-w-lg', xl:'max-w-xl'};
+  return (
+    <div className="overlay" onClick={onClose}>
+      <div className={`${sizes[size]} w-full max-h-[80vh] bg-white rounded-2xl p-6 overflow-y-auto`} onClick={e=>e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-bold text-gray-800">{title}</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">×</button>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+};
+
+// ─── BADGE COMPONENT ───────────────────────────────────────
+const Badge = ({s}) => {
+  const colors = {
+    'Accept':'bg-green-100 text-green-700',
+    'Quarantine':'bg-red-100 text-red-700',
+    'Redress':'bg-yellow-100 text-yellow-700',
+    'Available':'bg-blue-100 text-blue-700',
+    'In Job':'bg-purple-100 text-purple-700',
+    'Scrap':'bg-gray-100 text-gray-700',
+    'Active':'bg-green-100 text-green-700',
+    'Inactive':'bg-gray-100 text-gray-700',
+    'Pending':'bg-yellow-100 text-yellow-700',
+    'Approved':'bg-green-100 text-green-700',
+    'Rejected':'bg-red-100 text-red-700',
+    'Medium':'bg-orange-100 text-orange-700',
+    'High':'bg-red-100 text-red-700',
+    'Low':'bg-blue-100 text-blue-700',
+    'Delivered':'bg-green-100 text-green-700',
+    'Received':'bg-green-100 text-green-700',
+    'Open':'bg-blue-100 text-blue-700',
+    'Closed':'bg-gray-100 text-gray-700',
+    'Planning':'bg-blue-100 text-blue-700',
+    'Completed':'bg-green-100 text-green-700',
+    'Draft':'bg-gray-100 text-gray-700',
+    'Sent':'bg-blue-100 text-blue-700',
+    'Paid':'bg-green-100 text-green-700',
+    'Created':'bg-blue-100 text-blue-700',
+    'Service Delivered':'bg-purple-100 text-purple-700',
+    'Asset Returned':'bg-orange-100 text-orange-700',
+    'Invoiced':'bg-yellow-100 text-yellow-700',
+  };
+  return <span className={`badge ${colors[s] || 'bg-gray-100 text-gray-700'}`}>{s}</span>;
+};
+
+// ─── SIDEBAR ────────────────────────────────────────────────
+const Sidebar = ({page, setPage, lang, setLang}) => {
+  const t = T[lang];
+  const navItems = [
+    {key:'dashboard', icon:'📊'},
+    {key:'jobs', icon:'🔧'},
+    {key:'serviceDelivery', icon:'📦'},
+    {key:'backload', icon:'🔄'},
+    {key:'assets', icon:'🚚'},
+    {key:'inspection', icon:'✅'},
+    {key:'maintenance', icon:'🛠️'},
+    {key:'q2c', icon:'💰'},
+    {key:'kpi', icon:'📈'},
+    {key:'governance', icon:'⚖️'},
+    {key:'users', icon:'👤'},
+    {key:'assetMgmt', icon:'🏭'},
+  ];
+
+  return (
+    <aside style={{width:'250px', background:'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)', color:'white', padding:'20px', minHeight:'100vh', overflowY:'auto'}}>
+      <div style={{fontSize:'18px', fontWeight:'bold', marginBottom:'30px', cursor:'pointer'}} onClick={()=>setPage('dashboard')}>{t.appName}</div>
+      <nav style={{marginBottom:'30px'}}>
+        {navItems.map(item=>(
+          <div key={item.key} onClick={()=>setPage(item.key)} className={`sidebar-item px-4 py-3 rounded-lg mb-1 text-sm font-medium ${page===item.key?'active':''}`}>
+            {item.icon} {t[item.key]}
+          </div>
+        ))}
+      </nav>
+      <div style={{borderTop:'1px solid rgba(255,255,255,0.1)', paddingTop:'20px'}}>
+        <button onClick={()=>setLang(lang==='en'?'ar':'en')} className="w-full px-4 py-2 bg-white text-slate-800 rounded-lg font-medium text-sm hover:bg-gray-100">
+          {lang === 'en' ? 'عربي' : 'English'}
+        </button>
+      </div>
+    </aside>
+  );
+};
+
+// ─── DASHBOARD ──────────────────────────────────────────────
+const Dashboard = () => {
+  const {jobs, assets, tickets, backloads, inspections, workOrders, quotes, invoices, approvals, setPage, lang} = useContext(Ctx);
+  const t = T[lang];
+  const activeJobs = jobs.filter(j=>['Created','Service Delivered','Asset Returned'].includes(j.status)).length;
+  const inJob = assets.filter(a=>a.status==='In Job').length;
+  const totHours = assets.reduce((s,a)=>s+a.hours,0);
+  const pendingApprovals = approvals.filter(a=>a.status==='Pending').length;
+  const openWOs = workOrders.filter(w=>w.status!=='Closed').length;
+  const unpaidInv = invoices.filter(i=>i.status!=='Paid').length;
+
+  // Build recent activity from all transactions
+  const activity = [];
+  jobs.forEach(j => activity.push({date: j.startDate, icon:'🔧', text:`Job ${j.jobNumber} created for ${j.client}`, type:'job', page:'jobs'}));
+  tickets.forEach(tk => activity.push({date: tk.deliveryDate, icon:'📦', text:`Service delivery ${tk.id} dispatched (${tk.deliveredTools.length} tools)`, type:'delivery', page:'serviceDelivery'}));
+  backloads.forEach(bl => activity.push({date: bl.receivedDate, icon:'🔄', text:`Backload ${bl.id} received (${bl.tools.length} tools)`, type:'backload', page:'backload'}));
+  inspections.forEach(ins => activity.push({date: ins.date, icon:'✅', text:`Inspection ${ins.id}: ${ins.serial} — ${ins.result}`, type:'inspection', page:'inspection'}));
+  workOrders.forEach(wo => activity.push({date: wo.createdDate, icon:'🛠️', text:`Work Order ${wo.id}: ${wo.type} for ${wo.serial}`, type:'maintenance', page:'maintenance'}));
+  quotes.forEach(q => activity.push({date: q.createdDate||'2024-03-10', icon:'💰', text:`Quote ${q.id} — ${q.client} (SAR ${q.total.toLocaleString()}) — ${q.status}`, type:'quote', page:'q2c'}));
+  invoices.forEach(inv => activity.push({date: inv.issuedDate, icon:'🧾', text:`Invoice ${inv.id} — ${inv.client} (SAR ${inv.amount.toLocaleString()}) — ${inv.status}`, type:'invoice', page:'q2c'}));
+  activity.sort((a,b) => (b.date||'').localeCompare(a.date||''));
+  const recentActivity = activity.slice(0, 15);
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-5">
+        <h1 className="text-2xl font-bold text-gray-800">{t.dashboard}</h1>
+        <ExportBar title="Dashboard" data={[{activeJobs, inJob, totHours}]} />
+      </div>
+      <div className="grid grid-cols-3 gap-4 mb-4">
+        <div className="card border-l-4 border-blue-400 cursor-pointer hover:shadow-md transition-shadow" onClick={()=>setPage('jobs')}>
+          <div className="text-3xl font-bold text-blue-600">{activeJobs}</div>
+          <div className="text-sm text-gray-500 mt-1">Active Jobs</div>
+          <div className="text-xs text-blue-400 mt-2">Click to view jobs →</div>
+        </div>
+        <div className="card border-l-4 border-purple-400 cursor-pointer hover:shadow-md transition-shadow" onClick={()=>setPage('assets')}>
+          <div className="text-3xl font-bold text-purple-600">{inJob}</div>
+          <div className="text-sm text-gray-500 mt-1">Tools In Job</div>
+          <div className="text-xs text-purple-400 mt-2">Click to view assets →</div>
+        </div>
+        <div className="card border-l-4 border-green-400 cursor-pointer hover:shadow-md transition-shadow" onClick={()=>setPage('kpi')}>
+          <div className="text-3xl font-bold text-green-600">{totHours}</div>
+          <div className="text-sm text-gray-500 mt-1">Total Operating Hours</div>
+          <div className="text-xs text-green-400 mt-2">Click to view KPIs →</div>
+        </div>
+      </div>
+      <div className="grid grid-cols-3 gap-4 mb-6">
+        <div className="card border-l-4 border-yellow-400 cursor-pointer hover:shadow-md transition-shadow" onClick={()=>setPage('governance')}>
+          <div className="text-3xl font-bold text-yellow-600">{pendingApprovals}</div>
+          <div className="text-sm text-gray-500 mt-1">Pending Approvals</div>
+          <div className="text-xs text-yellow-400 mt-2">Click to review →</div>
+        </div>
+        <div className="card border-l-4 border-orange-400 cursor-pointer hover:shadow-md transition-shadow" onClick={()=>setPage('maintenance')}>
+          <div className="text-3xl font-bold text-orange-600">{openWOs}</div>
+          <div className="text-sm text-gray-500 mt-1">Open Work Orders</div>
+          <div className="text-xs text-orange-400 mt-2">Click to view maintenance →</div>
+        </div>
+        <div className="card border-l-4 border-red-400 cursor-pointer hover:shadow-md transition-shadow" onClick={()=>setPage('q2c')}>
+          <div className="text-3xl font-bold text-red-600">{unpaidInv}</div>
+          <div className="text-sm text-gray-500 mt-1">Unpaid Invoices</div>
+          <div className="text-xs text-red-400 mt-2">Click to view invoices →</div>
+        </div>
+      </div>
+      <div className="card">
+        <h2 className="font-semibold text-gray-700 mb-4">Recent Activity</h2>
+        {recentActivity.length===0 ? (
+          <div className="text-sm text-gray-500 text-center py-8">No activity to display</div>
+        ) : (
+          <div className="space-y-0">
+            {recentActivity.map((a, i) => (
+              <div key={i} onClick={()=>setPage(a.page)} className="flex items-center gap-3 py-3 border-b last:border-0 cursor-pointer hover:bg-gray-50 rounded px-2 -mx-2">
+                <span className="text-lg">{a.icon}</span>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm text-gray-800 truncate">{a.text}</div>
+                  <div className="text-xs text-gray-400">{a.date}</div>
+                </div>
+                <span className="text-xs text-blue-400 no-print">View →</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ─── JOB DETAIL VIEW ────────────────────────────────────────
+const JobDetail = ({jobId, onBack}) => {
+  const {jobs, tickets, backloads, lang} = useContext(Ctx);
+  const t = T[lang];
+  const job = jobs.find(j => j.id === jobId);
+  if (!job) return null;
+
+  const jobTickets = tickets.filter(tk => tk.jobId === jobId);
+  const jobBackloads = backloads.filter(bl => bl.jobId === jobId);
+
+  const statusSteps = ['Created', 'Service Delivered', 'Asset Returned', 'Invoiced', 'Closed'];
+  const currentStepIndex = statusSteps.indexOf(job.status);
+
+  return (
+    <div>
+      <button onClick={onBack} className="mb-5 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm hover:bg-gray-200 no-print">← Back to Jobs</button>
+      <div className="grid grid-cols-2 gap-4 mb-5">
+        <div className="card">
+          <div className="text-xs text-gray-500 mb-1">Job Number</div>
+          <div className="font-mono font-bold text-blue-600 text-lg">{job.jobNumber}</div>
+        </div>
+        <div className="card">
+          <div className="text-xs text-gray-500 mb-1">Status</div>
+          <Badge s={job.status}/>
+        </div>
+        <div className="card">
+          <div className="text-xs text-gray-500 mb-1">Well</div>
+          <div className="font-medium">{job.well}</div>
+        </div>
+        <div className="card">
+          <div className="text-xs text-gray-500 mb-1">Client</div>
+          <div className="font-medium">{job.client}</div>
+        </div>
+        <div className="card">
+          <div className="text-xs text-gray-500 mb-1">Start Date</div>
+          <div className="text-sm">{job.startDate}</div>
+        </div>
+        <div className="card">
+          <div className="text-xs text-gray-500 mb-1">Est. Completion</div>
+          <div className="text-sm">{job.estComplDate}</div>
+        </div>
+      </div>
+
+      <div className="card mb-5">
+        <h3 className="font-semibold text-gray-700 mb-4">Status Timeline</h3>
+        <div className="flex items-center gap-2">
+          {statusSteps.map((step, idx) => (
+            <div key={step} className="flex items-center">
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${idx <= currentStepIndex ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-500'}`}>
+                {idx + 1}
+              </div>
+              {idx < statusSteps.length - 1 && <div className={`h-1 w-8 ${idx < currentStepIndex ? 'bg-blue-600' : 'bg-gray-200'}`}/>}
+            </div>
+          ))}
+        </div>
+        <div className="text-xs text-gray-500 mt-2">Current: {job.status}</div>
+      </div>
+
+      {jobTickets.length > 0 && (
+        <div className="card mb-5">
+          <h3 className="font-semibold text-gray-700 mb-3">Service Delivery Tickets</h3>
+          <table className="w-full text-sm">
+            <thead><tr className="bg-gray-50 text-left text-gray-400 border-b text-xs">
+              <th className="px-3 py-2">Ticket ID</th>
+              <th className="px-3 py-2">Manifest</th>
+              <th className="px-3 py-2">Tools</th>
+              <th className="px-3 py-2">Date</th>
+              <th className="px-3 py-2">Status</th>
+            </tr></thead>
+            <tbody>
+              {jobTickets.map(tk => (
+                <tr key={tk.id} className="border-b last:border-0">
+                  <td className="px-3 py-2 font-mono text-blue-600 text-xs">{tk.id}</td>
+                  <td className="px-3 py-2 text-xs">{tk.manifest}</td>
+                  <td className="px-3 py-2 text-xs">{tk.deliveredTools.length} tools</td>
+                  <td className="px-3 py-2 text-xs text-gray-400">{tk.deliveryDate}</td>
+                  <td className="px-3 py-2"><Badge s={tk.status}/></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {jobBackloads.length > 0 && (
+        <div className="card mb-5">
+          <h3 className="font-semibold text-gray-700 mb-3">Backloads</h3>
+          <table className="w-full text-sm">
+            <thead><tr className="bg-gray-50 text-left text-gray-400 border-b text-xs">
+              <th className="px-3 py-2">BL ID</th>
+              <th className="px-3 py-2">Ticket</th>
+              <th className="px-3 py-2">Tools</th>
+              <th className="px-3 py-2">Status</th>
+              <th className="px-3 py-2">Date</th>
+            </tr></thead>
+            <tbody>
+              {jobBackloads.map(bl => (
+                <tr key={bl.id} className="border-b last:border-0">
+                  <td className="px-3 py-2 font-mono text-blue-600 text-xs">{bl.id}</td>
+                  <td className="px-3 py-2 text-xs">{bl.ticketId}</td>
+                  <td className="px-3 py-2 text-xs">{bl.tools.length} tools</td>
+                  <td className="px-3 py-2"><Badge s={bl.status}/></td>
+                  <td className="px-3 py-2 text-xs text-gray-400">{bl.receivedDate}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {job.nptEvents.length > 0 && (
+        <div className="card">
+          <h3 className="font-semibold text-gray-700 mb-3">NPT Events</h3>
+          <div className="space-y-2">
+            {job.nptEvents.map((evt, idx) => (
+              <div key={idx} className="flex justify-between items-center p-2 bg-gray-50 rounded">
+                <span className="text-sm">{evt.reason}</span>
+                <span className="font-bold text-red-600">{evt.hours}h</span>
+              </div>
+            ))}
+            <div className="flex justify-between items-center p-2 bg-red-50 rounded border border-red-200 font-bold">
+              <span>Total NPT</span>
+              <span className="text-red-600">{job.nptEvents.reduce((s, e) => s + e.hours, 0)}h</span>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ─── JOBS ───────────────────────────────────────────────────
+const Jobs = () => {
+  const {jobs, setJobs, wells, setWells, clients, setClients, assets, setAssets, lang} = useContext(Ctx);
+  const t = T[lang];
+  const [show, setShow] = useState(false);
+  const [selectedJobId, setSelectedJobId] = useState(null);
+  const [newJob, setNewJob] = useState({well:'', client:'', startDate:'', estComplDate:''});
+  const [newWellText, setNewWellText] = useState('');
+  const [newClientText, setNewClientText] = useState('');
+  const [showNewWell, setShowNewWell] = useState(false);
+  const [showNewClient, setShowNewClient] = useState(false);
+
+  const generateJobNumber = () => {
+    const year = new Date().getFullYear();
+    const nextNum = jobs.filter(j => j.jobNumber.startsWith(`JP-${year}`)).length + 1;
+    return `JP-${year}-${String(nextNum).padStart(3, '0')}`;
+  };
+
+  const addJob = () => {
+    if(newJob.well && newJob.client) {
+      const jobNumber = generateJobNumber();
+      setJobs([...jobs, {id:'J'+(jobs.length+1), jobNumber, well:newJob.well, client:newJob.client, status:'Created', startDate:newJob.startDate, estComplDate:newJob.estComplDate, nptEvents:[]}]);
+      setNewJob({well:'', client:'', startDate:'', estComplDate:''});
+      setShow(false);
+    }
+  };
+
+  const addNewWell = () => {
+    if(newWellText && !wells.includes(newWellText)) {
+      setWells([...wells, newWellText]);
+      setNewJob({...newJob, well:newWellText});
+      setNewWellText('');
+      setShowNewWell(false);
+    }
+  };
+
+  const addNewClient = () => {
+    if(newClientText && !clients.includes(newClientText)) {
+      setClients([...clients, newClientText]);
+      setNewJob({...newJob, client:newClientText});
+      setNewClientText('');
+      setShowNewClient(false);
+    }
+  };
+
+  if(selectedJobId) {
+    return <JobDetail jobId={selectedJobId} onBack={() => setSelectedJobId(null)} />;
+  }
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-5">
+        <h1 className="text-2xl font-bold text-gray-800">{t.jobs}</h1>
+        <div className="flex items-center gap-3">
+          <ExportBar title="Jobs" data={jobs} />
+          <button onClick={()=>setShow(true)} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 no-print">+ {t.createJob}</button>
+        </div>
+      </div>
+      <div className="card p-0 overflow-hidden">
+        <table className="w-full text-sm">
+          <thead><tr className="bg-gray-50 text-left text-gray-400 border-b text-xs">
+            <th className="px-4 py-3">Job Number</th><th className="px-4 py-3">Well</th>
+            <th className="px-4 py-3">Client</th><th className="px-4 py-3">Status</th>
+            <th className="px-4 py-3">Start Date</th><th className="px-4 py-3">Est. Compl</th>
+            <th className="px-4 py-3">NPT (h)</th>
+          </tr></thead>
+          <tbody>
+            {jobs.map(j=>(
+              <tr key={j.id} onClick={() => setSelectedJobId(j.id)} className="tr-hover border-b last:border-0">
+                <td className="px-4 py-3 font-mono text-blue-600 text-xs">{j.jobNumber}</td>
+                <td className="px-4 py-3 text-sm">{j.well}</td>
+                <td className="px-4 py-3 text-sm">{j.client}</td>
+                <td className="px-4 py-3"><Badge s={j.status}/></td>
+                <td className="px-4 py-3 text-xs text-gray-400">{j.startDate}</td>
+                <td className="px-4 py-3 text-xs text-gray-400">{j.estComplDate}</td>
+                <td className="px-4 py-3 font-bold text-red-600">{j.nptEvents.reduce((s,e)=>s+e.hours,0)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {show&&(
+        <Modal title={t.createJob} onClose={()=>setShow(false)}>
+          <div className="space-y-4">
+            <div><label className="text-xs text-gray-500 block mb-1">Well *</label>
+              {!showNewWell ? (
+                <select value={newJob.well} onChange={e => {
+                  if(e.target.value === '__add__') {
+                    setShowNewWell(true);
+                  } else {
+                    setNewJob({...newJob, well:e.target.value});
+                  }
+                }} className="w-full border rounded-lg px-3 py-2 text-sm">
+                  <option value="">— Select Well —</option>
+                  {wells.map(w => <option key={w} value={w}>{w}</option>)}
+                  <option value="__add__">+ Add New Well</option>
+                </select>
+              ) : (
+                <div className="flex gap-2">
+                  <input type="text" placeholder="Enter well name" value={newWellText} onChange={e => setNewWellText(e.target.value)} className="flex-1 border rounded-lg px-3 py-2 text-sm"/>
+                  <button onClick={addNewWell} className="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm">Add</button>
+                  <button onClick={() => setShowNewWell(false)} className="px-3 py-2 border rounded-lg text-sm">Cancel</button>
+                </div>
+              )}
+            </div>
+            <div><label className="text-xs text-gray-500 block mb-1">Client *</label>
+              {!showNewClient ? (
+                <select value={newJob.client} onChange={e => {
+                  if(e.target.value === '__add__') {
+                    setShowNewClient(true);
+                  } else {
+                    setNewJob({...newJob, client:e.target.value});
+                  }
+                }} className="w-full border rounded-lg px-3 py-2 text-sm">
+                  <option value="">— Select Client —</option>
+                  {clients.map(c => <option key={c} value={c}>{c}</option>)}
+                  <option value="__add__">+ Add New Client</option>
+                </select>
+              ) : (
+                <div className="flex gap-2">
+                  <input type="text" placeholder="Enter client name" value={newClientText} onChange={e => setNewClientText(e.target.value)} className="flex-1 border rounded-lg px-3 py-2 text-sm"/>
+                  <button onClick={addNewClient} className="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm">Add</button>
+                  <button onClick={() => setShowNewClient(false)} className="px-3 py-2 border rounded-lg text-sm">Cancel</button>
+                </div>
+              )}
+            </div>
+            <input type="date" value={newJob.startDate} onChange={e=>setNewJob({...newJob, startDate:e.target.value})} className="w-full border rounded-lg px-3 py-2 text-sm"/>
+            <input type="date" value={newJob.estComplDate} onChange={e=>setNewJob({...newJob, estComplDate:e.target.value})} className="w-full border rounded-lg px-3 py-2 text-sm"/>
+            <div className="flex gap-2 justify-end pt-2">
+              <button onClick={()=>setShow(false)} className="px-4 py-2 text-sm border rounded-lg">{t.cancel}</button>
+              <button onClick={addJob} className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg">{t.save}</button>
+            </div>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+};
+
+// ─── ASSET HISTORY MODAL ────────────────────────────────────
+const AssetHistoryModal = ({asset, onClose}) => {
+  return (
+    <Modal title={`History - ${asset.serial}`} onClose={onClose} size="lg">
+      {asset.history && asset.history.length > 0 ? (
+        <div className="space-y-3">
+          {asset.history.map((evt, idx) => (
+            <div key={idx} className="p-3 border rounded-lg">
+              <div className="flex justify-between items-start mb-1">
+                <span className="font-medium text-sm">{evt.event}</span>
+                <span className="text-xs text-gray-400">{evt.date}</span>
+              </div>
+              {evt.jobNumber && <div className="text-xs text-blue-600 mb-1">Job: {evt.jobNumber}</div>}
+              {evt.client && <div className="text-xs text-gray-600">Client: {evt.client}</div>}
+              {evt.details && <div className="text-xs text-gray-500 mt-1">{evt.details}</div>}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="text-center text-gray-400 text-sm py-4">No history events</div>
+      )}
+    </Modal>
+  );
+};
+
+// ─── SERVICE DELIVERY ────────────────────────────────────────
+const ServiceDelivery = () => {
+  const {tickets, setTickets, jobs, setJobs, assets, setAssets, lang} = useContext(Ctx);
+  const t = T[lang];
+  const [show, setShow] = useState(false);
+  const [detail, setDetail] = useState(null);
+  const [jobId, setJobId] = useState('');
+  const [sel, setSel] = useState([]);
+  const nonClosedJobs = jobs.filter(j=>j.status!=='Closed');
+  const avail = assets.filter(a=>a.status==='Available');
+
+  const toggle = (id) => setSel(sel.includes(id) ? sel.filter(x=>x!==id) : [...sel, id]);
+
+  const dispatch = () => {
+    if(!jobId || sel.length===0) return;
+    const tk = {id:'TK'+Date.now(), jobId, manifest:'MNF-'+Date.now(), deliveredTools:sel, deliveryDate:new Date().toISOString().slice(0,10), deliveryConfirmed:false, status:'Dispatched'};
+    setTickets([...tickets, tk]);
+    const job = jobs.find(j => j.id === jobId);
+    setJobs(jobs.map(j => j.id === jobId ? {...j, status:'Service Delivered'} : j));
+    sel.forEach(aid => {
+      setAssets(prev=>prev.map(a=>{
+        if(a.id===aid) {
+          const newHistory = [...(a.history || []), {
+            date: new Date().toISOString().slice(0,10),
+            event: 'Dispatched to job',
+            jobNumber: job.jobNumber,
+            client: job.client,
+            details: `Service delivery manifest ${tk.manifest}`
+          }];
+          return {...a, status:'In Job', assignedTo:job.client, history:newHistory};
+        }
+        return a;
+      }));
+    });
+    setShow(false);
+    setJobId('');
+    setSel([]);
+  };
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-5">
+        <h1 className="text-2xl font-bold text-gray-800">{t.serviceDelivery}</h1>
+        <div className="flex items-center gap-3">
+          <ExportBar title="ServiceDelivery" data={tickets} />
+          <button onClick={()=>setShow(true)} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 no-print">+ {t.createTicket}</button>
+        </div>
+      </div>
+      <div className="card p-0 overflow-hidden">
+        <table className="w-full text-sm">
+          <thead><tr className="bg-gray-50 text-left text-gray-400 border-b text-xs">
+            <th className="px-4 py-3">Ticket</th><th className="px-4 py-3">Job</th>
+            <th className="px-4 py-3">Manifest</th><th className="px-4 py-3">Tools</th>
+            <th className="px-4 py-3">Date</th><th className="px-4 py-3">Confirmed</th>
+            <th className="px-4 py-3">Status</th><th className="px-4 py-3"></th>
+          </tr></thead>
+          <tbody>
+            {tickets.map(tk=>(
+              <tr key={tk.id} className="tr-hover border-b last:border-0">
+                <td className="px-4 py-3 font-mono text-blue-600 text-xs">{tk.id}</td>
+                <td className="px-4 py-3 text-xs">{jobs.find(j=>j.id===tk.jobId)?.jobNumber||tk.jobId}</td>
+                <td className="px-4 py-3 font-mono text-xs text-gray-400">{tk.manifest||'—'}</td>
+                <td className="px-4 py-3 text-sm">{tk.deliveredTools.length}</td>
+                <td className="px-4 py-3 text-gray-400 text-xs">{tk.deliveryDate||'—'}</td>
+                <td className="px-4 py-3 text-sm">{tk.deliveryConfirmed?'✅':'⏳'}</td>
+                <td className="px-4 py-3"><Badge s={tk.status}/></td>
+                <td className="px-4 py-3"><button onClick={()=>setDetail(tk)} className="text-blue-600 text-xs hover:underline no-print">View</button></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {detail&&(
+        <Modal title={`Ticket Details — ${detail.id}`} onClose={()=>setDetail(null)} size="lg">
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <div className="text-xs text-gray-400 mb-1">Ticket ID</div>
+                <div className="font-mono text-blue-600 text-sm">{detail.id}</div>
+              </div>
+              <div>
+                <div className="text-xs text-gray-400 mb-1">Job</div>
+                <div className="text-sm font-medium">{jobs.find(j=>j.id===detail.jobId)?.jobNumber||detail.jobId}</div>
+              </div>
+              <div>
+                <div className="text-xs text-gray-400 mb-1">Manifest</div>
+                <div className="font-mono text-sm">{detail.manifest||'—'}</div>
+              </div>
+              <div>
+                <div className="text-xs text-gray-400 mb-1">Delivery Date</div>
+                <div className="text-sm">{detail.deliveryDate||'—'}</div>
+              </div>
+              <div>
+                <div className="text-xs text-gray-400 mb-1">Status</div>
+                <div><Badge s={detail.status}/></div>
+              </div>
+              <div>
+                <div className="text-xs text-gray-400 mb-1">Confirmed</div>
+                <div className="text-sm">{detail.deliveryConfirmed ? '✅ Yes' : '⏳ Pending'}</div>
+              </div>
+            </div>
+            <div>
+              <div className="text-xs font-medium text-gray-700 mb-2">Delivered Tools ({detail.deliveredTools.length})</div>
+              <div className="border rounded-lg overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead><tr className="bg-gray-50 text-left text-gray-400 text-xs">
+                    <th className="px-3 py-2">Serial</th><th className="px-3 py-2">Type</th><th className="px-3 py-2">Product Line</th><th className="px-3 py-2">Current Status</th>
+                  </tr></thead>
+                  <tbody>
+                    {detail.deliveredTools.map(aid => {
+                      const a = assets.find(x=>x.id===aid);
+                      return a ? (
+                        <tr key={aid} className="border-t">
+                          <td className="px-3 py-2 font-mono text-blue-600 text-xs">{a.serial}</td>
+                          <td className="px-3 py-2 text-sm">{a.type}</td>
+                          <td className="px-3 py-2 text-xs text-gray-400">{a.productLine}</td>
+                          <td className="px-3 py-2"><Badge s={a.status}/></td>
+                        </tr>
+                      ) : (
+                        <tr key={aid} className="border-t"><td colSpan={4} className="px-3 py-2 text-xs text-gray-400">{aid} (not found)</td></tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div className="flex justify-end pt-2">
+              <button onClick={()=>setDetail(null)} className="px-4 py-2 text-sm border rounded-lg">Close</button>
+            </div>
+          </div>
+        </Modal>
+      )}
+      {show&&(
+        <Modal title="New Dispatch / Delivery Manifest" onClose={()=>setShow(false)} size="lg">
+          <div className="space-y-4">
+            <div><label className="text-xs text-gray-500 block mb-1">Select Job *</label>
+              <select className="w-full border rounded-lg px-3 py-2 text-sm" value={jobId} onChange={e=>setJobId(e.target.value)}>
+                <option value="">— Select Job —</option>
+                {nonClosedJobs.map(j=><option key={j.id} value={j.id}>{j.jobNumber} · {j.well}</option>)}
+              </select>
+            </div>
+            <div><label className="text-xs text-gray-500 block mb-2">Select Tools to Dispatch *</label>
+              <div className="border rounded-lg max-h-60 overflow-y-auto">
+                {avail.length===0?<div className="p-4 text-gray-400 text-sm text-center">No available tools</div>:
+                  avail.map(a=>(
+                    <label key={a.id} className="flex items-center gap-3 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b last:border-0">
+                      <input type="checkbox" checked={sel.includes(a.id)} onChange={()=>toggle(a.id)}/>
+                      <div><span className="font-mono text-xs text-blue-600">{a.serial}</span><span className="ml-2 text-sm">{a.type}</span><span className="ml-2 text-xs text-gray-400">({a.productLine})</span></div>
+                    </label>
+                  ))
+                }
+              </div>
+            </div>
+            <div className="bg-blue-50 rounded-lg p-3 text-xs text-blue-700">📋 Manifest with serial numbers, GPS timestamp & digital signature will be auto-generated on dispatch.</div>
+            <div className="flex gap-2 justify-end pt-2">
+              <button onClick={()=>setShow(false)} className="px-4 py-2 text-sm border rounded-lg">{t.cancel}</button>
+              <button onClick={dispatch} disabled={!jobId||sel.length===0} className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg disabled:opacity-40">Dispatch & Generate Manifest</button>
+            </div>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+};
+
+// ─── BACKLOAD ────────────────────────────────────────────────
+const Backload = () => {
+  const {backloads, setBackloads, tickets, jobs, setJobs, assets, setAssets, workOrders, setWorkOrders, lang} = useContext(Ctx);
+  const t = T[lang];
+  const [show, setShow] = useState(false);
+  const [ticketId, setTicketId] = useState('');
+  const [cond, setCond] = useState({});
+
+  const selTk = tickets.find(t=>t.id===ticketId);
+  const tkTools = selTk ? selTk.deliveredTools.map(id=>assets.find(a=>a.id===id)).filter(Boolean) : [];
+
+  const submit = () => {
+    const bl = {id:'BL'+Date.now(), jobId:selTk.jobId, ticketId, status:'Received', tools:tkTools.map(a=>({serial:a.serial, condition:cond[a.id]||'OK', notes:''})), submittedDate:new Date().toISOString().slice(0,10), receivedDate:new Date().toISOString().slice(0,10), receivedBy:'Yard Supervisor'};
+    setBackloads([...backloads, bl]);
+    const job = jobs.find(j => j.id === selTk.jobId);
+    setJobs(jobs.map(j => j.id === selTk.jobId ? {...j, status:'Asset Returned'} : j));
+    const newWOs = [];
+    tkTools.forEach(a=>{
+      const c = cond[a.id]||'OK';
+      const ns = c==='Missing'?'Quarantine':c==='Damaged'?'Quarantine':'Redress';
+      setAssets(prev=>prev.map(x=>{
+        if(x.id===a.id) {
+          const newHistory = [...(x.history || []), {
+            date: new Date().toISOString().slice(0,10),
+            event: 'Returned from job',
+            jobNumber: job.jobNumber,
+            client: job.client,
+            details: `Condition: ${c}`
+          }];
+          return {...x, status:ns, assignedTo:null, history:newHistory};
+        }
+        return x;
+      }));
+      if(c!=='Missing') newWOs.push({id:'WO'+Date.now()+a.id, toolId:a.id, serial:a.serial, type:'Redress', status:'Open', createdDate:new Date().toISOString().slice(0,10), assignedTo:'Workshop Team', notes:'Auto-created from backload'});
+    });
+    setWorkOrders(prev=>[...prev, ...newWOs]);
+    setShow(false);
+    setTicketId('');
+    setCond({});
+  };
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-5">
+        <h1 className="text-2xl font-bold text-gray-800">{t.backload}</h1>
+        <div className="flex items-center gap-3">
+          <ExportBar title="Backload" data={backloads} />
+          <button onClick={()=>setShow(true)} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 no-print">+ {t.createBackload}</button>
+        </div>
+      </div>
+      <div className="card p-0 overflow-hidden">
+        <table className="w-full text-sm">
+          <thead><tr className="bg-gray-50 text-left text-gray-400 border-b text-xs">
+            <th className="px-4 py-3">BL ID</th><th className="px-4 py-3">Job</th>
+            <th className="px-4 py-3">Ticket</th><th className="px-4 py-3">Tools / Condition</th>
+            <th className="px-4 py-3">Status</th><th className="px-4 py-3">Date</th><th className="px-4 py-3">Received By</th>
+          </tr></thead>
+          <tbody>
+            {backloads.length===0&&<tr><td colSpan={7} className="px-4 py-8 text-center text-gray-400 text-sm">{t.noData}</td></tr>}
+            {backloads.map(bl=>(
+              <tr key={bl.id} className="tr-hover border-b last:border-0">
+                <td className="px-4 py-3 font-mono text-blue-600 text-xs">{bl.id}</td>
+                <td className="px-4 py-3 text-xs">{jobs.find(j=>j.id===bl.jobId)?.jobNumber}</td>
+                <td className="px-4 py-3 font-mono text-xs text-gray-400">{bl.ticketId}</td>
+                <td className="px-4 py-3 text-xs">{bl.tools.map(t=>`${t.serial}(${t.condition})`).join(', ')}</td>
+                <td className="px-4 py-3"><Badge s={bl.status}/></td>
+                <td className="px-4 py-3 text-xs text-gray-400">{bl.receivedDate}</td>
+                <td className="px-4 py-3 text-xs">{bl.receivedBy}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {show&&(
+        <Modal title={t.createBackload} onClose={()=>setShow(false)} size="lg">
+          <div className="space-y-4">
+            <div><label className="text-xs text-gray-500 block mb-1">Select Ticket *</label>
+              <select className="w-full border rounded-lg px-3 py-2 text-sm" value={ticketId} onChange={e=>setTicketId(e.target.value)}>
+                <option value="">— Select Ticket —</option>
+                {tickets.map(tk=><option key={tk.id} value={tk.id}>{tk.id} ({tk.deliveredTools.length} tools)</option>)}
+              </select>
+            </div>
+            {selTk&&(
+              <div><label className="text-xs text-gray-500 block mb-2">Tool Conditions *</label>
+                {tkTools.map(t=>(
+                  <div key={t.id} className="flex items-center gap-3 p-2 border rounded-lg mb-2">
+                    <span className="text-xs font-mono text-blue-600 flex-1">{t.serial}</span>
+                    <select value={cond[t.id]||'OK'} onChange={e=>setCond({...cond, [t.id]:e.target.value})} className="border rounded px-2 py-1 text-xs">
+                      <option>OK</option><option>Damaged</option><option>Missing</option>
+                    </select>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="flex gap-2 justify-end pt-2">
+              <button onClick={()=>setShow(false)} className="px-4 py-2 text-sm border rounded-lg">{t.cancel}</button>
+              <button onClick={submit} disabled={!selTk} className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg disabled:opacity-40">Create Backload</button>
+            </div>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+};
+
+// ─── ASSETS (Read-only Fleet View) ──────────────────────────
+const Assets = () => {
+  const {assets, lang} = useContext(Ctx);
+  const t = T[lang];
+  const [historyAsset, setHistoryAsset] = useState(null);
+  const activeAssets = assets.filter(a=>a.active);
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-5">
+        <h1 className="text-2xl font-bold text-gray-800">{t.assets}</h1>
+        <ExportBar title="Assets" data={activeAssets} />
+      </div>
+      <div className="card p-0 overflow-hidden">
+        <table className="w-full text-sm">
+          <thead><tr className="bg-gray-50 text-left text-gray-400 border-b text-xs">
+            <th className="px-4 py-3">Serial</th><th className="px-4 py-3">Type</th>
+            <th className="px-4 py-3">Product Line</th><th className="px-4 py-3">Status</th>
+            <th className="px-4 py-3">Assigned To</th><th className="px-4 py-3">Runs</th>
+            <th className="px-4 py-3">Hours</th><th className="px-4 py-3">Next Maint</th>
+            <th className="px-4 py-3"></th>
+          </tr></thead>
+          <tbody>
+            {activeAssets.length===0&&<tr><td colSpan={9} className="px-4 py-8 text-center text-gray-400 text-sm">{t.noData}</td></tr>}
+            {activeAssets.map(a=>(
+              <tr key={a.id} className="tr-hover border-b last:border-0">
+                <td className="px-4 py-3 font-mono text-blue-600 text-xs">{a.serial}</td>
+                <td className="px-4 py-3 text-sm">{a.type}</td>
+                <td className="px-4 py-3 text-xs text-gray-400">{a.productLine}</td>
+                <td className="px-4 py-3"><Badge s={a.status}/></td>
+                <td className="px-4 py-3 text-sm">{a.assignedTo || '—'}</td>
+                <td className="px-4 py-3 text-sm">{a.runs}</td>
+                <td className="px-4 py-3 text-sm font-mono">{a.hours}</td>
+                <td className="px-4 py-3 text-xs text-gray-400">{a.nextMaintAt}</td>
+                <td className="px-4 py-3 no-print"><button onClick={() => setHistoryAsset(a)} className="text-blue-600 text-xs hover:underline">History</button></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {historyAsset && <AssetHistoryModal asset={historyAsset} onClose={() => setHistoryAsset(null)} />}
+    </div>
+  );
+};
+
+// ─── INSPECTION ────────────────────────────────────────────
+const Inspection = () => {
+  const {inspections, setInspections, assets, setAssets, lang} = useContext(Ctx);
+  const t = T[lang];
+  const [show, setShow] = useState(false);
+  const [newInsp, setNewInsp] = useState({toolId:'', inspectorName:'', result:'Accept', notes:''});
+
+  const submit = () => {
+    if(newInsp.toolId) {
+      const a = assets.find(x=>x.id===newInsp.toolId);
+      setInspections([...inspections, {id:'I'+Date.now(), ...newInsp, serial:a.serial, date:new Date().toISOString().slice(0,10)}]);
+      setAssets(prev=>prev.map(x=>x.id===newInsp.toolId?{
+        ...x,
+        status:newInsp.result==='Accept'?'Available':'Quarantine',
+        history:[...(x.history||[]), {date:new Date().toISOString().slice(0,10), event:'Inspection completed', details:`Result: ${newInsp.result}`}]
+      }:x));
+      setNewInsp({toolId:'', inspectorName:'', result:'Accept', notes:''});
+      setShow(false);
+    }
+  };
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-5">
+        <h1 className="text-2xl font-bold text-gray-800">{t.inspection}</h1>
+        <div className="flex items-center gap-3">
+          <ExportBar title="Inspection" data={inspections} />
+          <button onClick={()=>setShow(true)} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 no-print">+ {t.createInspection}</button>
+        </div>
+      </div>
+      <div className="card p-0 overflow-hidden">
+        <table className="w-full text-sm">
+          <thead><tr className="bg-gray-50 text-left text-gray-400 border-b text-xs">
+            <th className="px-4 py-3">ID</th><th className="px-4 py-3">Serial</th><th className="px-4 py-3">Inspector</th>
+            <th className="px-4 py-3">Result</th><th className="px-4 py-3">Date</th><th className="px-4 py-3">Notes</th>
+          </tr></thead>
+          <tbody>
+            {inspections.length===0&&<tr><td colSpan={6} className="px-4 py-8 text-center text-gray-400 text-sm">{t.noData}</td></tr>}
+            {inspections.map(i=>(
+              <tr key={i.id} className="tr-hover border-b last:border-0">
+                <td className="px-4 py-3 font-mono text-blue-600 text-xs">{i.id}</td>
+                <td className="px-4 py-3 font-mono text-xs text-gray-400">{i.serial}</td>
+                <td className="px-4 py-3 text-sm">{i.inspectorName}</td>
+                <td className="px-4 py-3"><Badge s={i.result}/></td>
+                <td className="px-4 py-3 text-xs text-gray-400">{i.date}</td>
+                <td className="px-4 py-3 text-xs text-gray-500">{i.notes}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {show&&(
+        <Modal title={t.createInspection} onClose={()=>setShow(false)}>
+          <div className="space-y-4">
+            <div><label className="text-xs text-gray-500 block mb-1">Select Tool *</label>
+              <select className="w-full border rounded-lg px-3 py-2 text-sm" value={newInsp.toolId} onChange={e=>setNewInsp({...newInsp, toolId:e.target.value})}>
+                <option value="">— Select Tool —</option>
+                {assets.map(a=><option key={a.id} value={a.id}>{a.serial} ({a.type})</option>)}
+              </select>
+            </div>
+            <input type="text" placeholder="Inspector Name" value={newInsp.inspectorName} onChange={e=>setNewInsp({...newInsp, inspectorName:e.target.value})} className="w-full border rounded-lg px-3 py-2 text-sm"/>
+            <select value={newInsp.result} onChange={e=>setNewInsp({...newInsp, result:e.target.value})} className="w-full border rounded-lg px-3 py-2 text-sm">
+              <option>Accept</option><option>Quarantine</option><option>Scrap</option>
+            </select>
+            <textarea placeholder="Notes" value={newInsp.notes} onChange={e=>setNewInsp({...newInsp, notes:e.target.value})} className="w-full border rounded-lg px-3 py-2 text-sm h-20"/>
+            <div className="flex gap-2 justify-end pt-2">
+              <button onClick={()=>setShow(false)} className="px-4 py-2 text-sm border rounded-lg">{t.cancel}</button>
+              <button onClick={submit} className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg">{t.save}</button>
+            </div>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+};
+
+// ─── MAINTENANCE ───────────────────────────────────────────
+const Maintenance = () => {
+  const {workOrders, setWorkOrders, assets, setAssets, lang} = useContext(Ctx);
+  const t = T[lang];
+  const [show, setShow] = useState(false);
+  const [detail, setDetail] = useState(null);
+  const [newWO, setNewWO] = useState({toolId:'', type:'Redress', status:'Open', assignedTo:'', notes:''});
+
+  const submit = () => {
+    if(newWO.toolId) {
+      const a = assets.find(x => x.id === newWO.toolId);
+      setWorkOrders([...workOrders, {id:'WO'+Date.now(), ...newWO, serial:a?.serial||'SN-TEST', createdDate:new Date().toISOString().slice(0,10)}]);
+      setAssets(prev=>prev.map(x=>x.id===newWO.toolId?{
+        ...x,
+        history:[...(x.history||[]), {date:new Date().toISOString().slice(0,10), event:'Maintenance work order created', details:newWO.notes}]
+      }:x));
+      setNewWO({toolId:'', type:'Redress', status:'Open', assignedTo:'', notes:''});
+      setShow(false);
+    }
+  };
+
+  const updateStatus = (woId, newStatus) => {
+    setWorkOrders(workOrders.map(w=>{
+      if(w.id===woId) {
+        const updated = {...w, status:newStatus};
+        if(newStatus==='Closed') updated.closedDate = new Date().toISOString().slice(0,10);
+        // If closing a work order, update asset back to Available
+        if(newStatus==='Closed' && w.toolId) {
+          setAssets(prev=>prev.map(a=>a.id===w.toolId?{
+            ...a, status:'Available',
+            history:[...(a.history||[]), {date:new Date().toISOString().slice(0,10), event:'Maintenance completed', details:`Work order ${w.id} closed`}]
+          }:a));
+        }
+        setDetail(updated);
+        return updated;
+      }
+      return w;
+    }));
+  };
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-5">
+        <h1 className="text-2xl font-bold text-gray-800">{t.maintenance}</h1>
+        <div className="flex items-center gap-3">
+          <ExportBar title="Maintenance" data={workOrders} />
+          <button onClick={()=>setShow(true)} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 no-print">+ {t.createWorkOrder}</button>
+        </div>
+      </div>
+      {/* Summary cards */}
+      <div className="grid grid-cols-3 gap-4 mb-5">
+        <div className="card p-4 border-l-4 border-blue-400">
+          <div className="text-2xl font-bold text-blue-600">{workOrders.filter(w=>w.status==='Open').length}</div>
+          <div className="text-xs text-gray-500 mt-1">Open</div>
+        </div>
+        <div className="card p-4 border-l-4 border-yellow-400">
+          <div className="text-2xl font-bold text-yellow-600">{workOrders.filter(w=>w.status==='In Progress').length}</div>
+          <div className="text-xs text-gray-500 mt-1">In Progress</div>
+        </div>
+        <div className="card p-4 border-l-4 border-green-400">
+          <div className="text-2xl font-bold text-green-600">{workOrders.filter(w=>w.status==='Closed').length}</div>
+          <div className="text-xs text-gray-500 mt-1">Closed</div>
+        </div>
+      </div>
+      <div className="card p-0 overflow-hidden">
+        <table className="w-full text-sm">
+          <thead><tr className="bg-gray-50 text-left text-gray-400 border-b text-xs">
+            <th className="px-4 py-3">WO ID</th><th className="px-4 py-3">Serial</th><th className="px-4 py-3">Type</th>
+            <th className="px-4 py-3">Status</th><th className="px-4 py-3">Assigned To</th><th className="px-4 py-3">Created</th><th className="px-4 py-3"></th>
+          </tr></thead>
+          <tbody>
+            {workOrders.length===0&&<tr><td colSpan={7} className="px-4 py-8 text-center text-gray-400 text-sm">{t.noData}</td></tr>}
+            {workOrders.map(w=>(
+              <tr key={w.id} className="tr-hover border-b last:border-0 cursor-pointer" onClick={()=>setDetail(w)}>
+                <td className="px-4 py-3 font-mono text-blue-600 text-xs">{w.id}</td>
+                <td className="px-4 py-3 font-mono text-xs text-gray-400">{w.serial}</td>
+                <td className="px-4 py-3 text-sm">{w.type}</td>
+                <td className="px-4 py-3"><Badge s={w.status}/></td>
+                <td className="px-4 py-3 text-sm">{w.assignedTo}</td>
+                <td className="px-4 py-3 text-xs text-gray-400">{w.createdDate}</td>
+                <td className="px-4 py-3 no-print"><span className="text-blue-600 text-xs hover:underline">View →</span></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {detail&&(
+        <Modal title={`Work Order — ${detail.id}`} onClose={()=>setDetail(null)} size="lg">
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <div className="text-xs text-gray-400 mb-1">Work Order ID</div>
+                <div className="font-mono text-blue-600 text-sm">{detail.id}</div>
+              </div>
+              <div>
+                <div className="text-xs text-gray-400 mb-1">Tool Serial</div>
+                <div className="font-mono text-sm">{detail.serial}</div>
+              </div>
+              <div>
+                <div className="text-xs text-gray-400 mb-1">Type</div>
+                <div className="text-sm font-medium">{detail.type}</div>
+              </div>
+              <div>
+                <div className="text-xs text-gray-400 mb-1">Status</div>
+                <div><Badge s={detail.status}/></div>
+              </div>
+              <div>
+                <div className="text-xs text-gray-400 mb-1">Assigned To</div>
+                <div className="text-sm">{detail.assignedTo || '—'}</div>
+              </div>
+              <div>
+                <div className="text-xs text-gray-400 mb-1">Created Date</div>
+                <div className="text-sm">{detail.createdDate}</div>
+              </div>
+            </div>
+            {detail.notes&&(
+              <div>
+                <div className="text-xs text-gray-400 mb-1">Notes</div>
+                <div className="text-sm bg-gray-50 rounded-lg p-3">{detail.notes}</div>
+              </div>
+            )}
+            {detail.closedDate&&(
+              <div>
+                <div className="text-xs text-gray-400 mb-1">Closed Date</div>
+                <div className="text-sm">{detail.closedDate}</div>
+              </div>
+            )}
+            {/* Status progression */}
+            <div>
+              <div className="text-xs font-medium text-gray-700 mb-2">Update Status</div>
+              <div className="flex gap-2">
+                {detail.status==='Open'&&(
+                  <button onClick={()=>updateStatus(detail.id,'In Progress')} className="px-3 py-1.5 text-xs bg-yellow-100 text-yellow-700 rounded-lg hover:bg-yellow-200 font-medium">Start Work</button>
+                )}
+                {(detail.status==='Open'||detail.status==='In Progress')&&(
+                  <button onClick={()=>updateStatus(detail.id,'Closed')} className="px-3 py-1.5 text-xs bg-green-100 text-green-700 rounded-lg hover:bg-green-200 font-medium">Mark Completed</button>
+                )}
+                {detail.status==='Closed'&&(
+                  <div className="text-xs text-green-600 bg-green-50 rounded-lg px-3 py-2">✅ This work order has been completed</div>
+                )}
+              </div>
+            </div>
+            {/* Tool info */}
+            {detail.toolId&&(()=>{
+              const a = assets.find(x=>x.id===detail.toolId);
+              return a ? (
+                <div>
+                  <div className="text-xs font-medium text-gray-700 mb-2">Tool Details</div>
+                  <div className="bg-gray-50 rounded-lg p-3 grid grid-cols-3 gap-3 text-sm">
+                    <div><span className="text-xs text-gray-400">Type:</span> {a.type}</div>
+                    <div><span className="text-xs text-gray-400">Product Line:</span> {a.productLine}</div>
+                    <div><span className="text-xs text-gray-400">Current Status:</span> <Badge s={a.status}/></div>
+                    <div><span className="text-xs text-gray-400">Runs:</span> {a.runs}</div>
+                    <div><span className="text-xs text-gray-400">Hours:</span> {a.hours}</div>
+                    <div><span className="text-xs text-gray-400">Assigned To:</span> {a.assignedTo||'—'}</div>
+                  </div>
+                </div>
+              ) : null;
+            })()}
+            <div className="flex justify-end pt-2">
+              <button onClick={()=>setDetail(null)} className="px-4 py-2 text-sm border rounded-lg">Close</button>
+            </div>
+          </div>
+        </Modal>
+      )}
+      {show&&(
+        <Modal title={t.createWorkOrder} onClose={()=>setShow(false)}>
+          <div className="space-y-4">
+            <div><label className="text-xs text-gray-500 block mb-1">Select Tool *</label>
+              <select className="w-full border rounded-lg px-3 py-2 text-sm" value={newWO.toolId} onChange={e=>setNewWO({...newWO, toolId:e.target.value})}>
+                <option value="">— Select Tool —</option>
+                {assets.map(a=><option key={a.id} value={a.id}>{a.serial} ({a.type})</option>)}
+              </select>
+            </div>
+            <select value={newWO.type} onChange={e=>setNewWO({...newWO, type:e.target.value})} className="w-full border rounded-lg px-3 py-2 text-sm">
+              <option>Redress</option><option>Maintenance</option><option>Repair</option>
+            </select>
+            <input type="text" placeholder="Assigned To" value={newWO.assignedTo} onChange={e=>setNewWO({...newWO, assignedTo:e.target.value})} className="w-full border rounded-lg px-3 py-2 text-sm"/>
+            <textarea placeholder="Notes" value={newWO.notes} onChange={e=>setNewWO({...newWO, notes:e.target.value})} className="w-full border rounded-lg px-3 py-2 text-sm h-20"/>
+            <div className="flex gap-2 justify-end pt-2">
+              <button onClick={()=>setShow(false)} className="px-4 py-2 text-sm border rounded-lg">{t.cancel}</button>
+              <button onClick={submit} className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg">{t.save}</button>
+            </div>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+};
+
+// ─── QUOTE TO CASH ────────────────────────────────────────────
+const Q2C = () => {
+  const {jobs, setJobs, clients, quotes, setQuotes, invoices, setInvoices, lang} = useContext(Ctx);
+  const t = T[lang];
+  const [tab, setTab] = useState('quotes');
+  const [showQuote, setShowQuote] = useState(false);
+  const [showInvoice, setShowInvoice] = useState(false);
+  const [qForm, setQForm] = useState({jobId:'', contract:'', total:'', description:''});
+  const [iForm, setIForm] = useState({jobId:'', client:'', amount:'', description:''});
+
+  const nonClosedJobs = jobs.filter(j=>j.status!=='Closed');
+
+  const createQuote = () => {
+    if(!qForm.jobId || !qForm.total) return;
+    const job = jobs.find(j=>j.id===qForm.jobId);
+    const q = {
+      id:'Q'+String(quotes.length+1).padStart(3,'0'),
+      jobId:qForm.jobId,
+      client:job?.client||'',
+      contract:qForm.contract || 'CTR-'+new Date().getFullYear()+'-'+String(quotes.length+1).padStart(3,'0'),
+      total:parseFloat(qForm.total)||0,
+      description:qForm.description,
+      status:'Pending',
+      createdDate:new Date().toISOString().slice(0,10)
+    };
+    setQuotes([...quotes, q]);
+    setQForm({jobId:'', contract:'', total:'', description:''});
+    setShowQuote(false);
+  };
+
+  const approveQuote = (qId) => {
+    setQuotes(quotes.map(q=>q.id===qId?{...q, status:'Approved'}:q));
+  };
+
+  const rejectQuote = (qId) => {
+    setQuotes(quotes.map(q=>q.id===qId?{...q, status:'Rejected'}:q));
+  };
+
+  const genInv = (q) => {
+    const inv = {id:'INV'+String(invoices.length+1).padStart(3,'0'), jobId:q.jobId, quoteId:q.id, client:q.client, amount:q.total, status:'Draft', issuedDate:new Date().toISOString().slice(0,10), dueDate:new Date(Date.now()+30*24*60*60*1000).toISOString().slice(0,10)};
+    setInvoices(prev=>[...prev, inv]);
+    setJobs(prev=>prev.map(j => j.id === q.jobId ? {...j, status:'Invoiced'} : j));
+  };
+
+  const createDirectInvoice = () => {
+    if(!iForm.jobId || !iForm.amount) return;
+    const job = jobs.find(j=>j.id===iForm.jobId);
+    const inv = {
+      id:'INV'+String(invoices.length+1).padStart(3,'0'),
+      jobId:iForm.jobId,
+      quoteId:null,
+      client:job?.client||iForm.client||'',
+      amount:parseFloat(iForm.amount)||0,
+      description:iForm.description,
+      status:'Draft',
+      issuedDate:new Date().toISOString().slice(0,10),
+      dueDate:new Date(Date.now()+30*24*60*60*1000).toISOString().slice(0,10)
+    };
+    setInvoices(prev=>[...prev, inv]);
+    setJobs(prev=>prev.map(j => j.id === iForm.jobId ? {...j, status:'Invoiced'} : j));
+    setIForm({jobId:'', client:'', amount:'', description:''});
+    setShowInvoice(false);
+  };
+
+  const markPaid = (invId) => {
+    const inv = invoices.find(i=>i.id===invId);
+    setInvoices(prev=>prev.map(i=>i.id===invId?{...i, status:'Paid'}:i));
+    if(inv) setJobs(prev=>prev.map(j => j.id === inv.jobId ? {...j, status:'Closed'} : j));
+  };
+
+  const markSent = (invId) => {
+    setInvoices(prev=>prev.map(i=>i.id===invId?{...i, status:'Sent'}:i));
+  };
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-5">
+        <h1 className="text-2xl font-bold text-gray-800">{t.q2c}</h1>
+        <div className="flex items-center gap-3">
+          <ExportBar title="Q2C" data={tab==='quotes'?quotes:invoices} />
+          {tab==='quotes'&&<button onClick={()=>setShowQuote(true)} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 no-print">+ Create Quote</button>}
+          {tab==='invoices'&&<button onClick={()=>setShowInvoice(true)} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 no-print">+ Create Invoice</button>}
+        </div>
+      </div>
+      {/* Summary cards */}
+      <div className="grid grid-cols-4 gap-4 mb-5">
+        <div className="card p-4 border-l-4 border-yellow-400">
+          <div className="text-2xl font-bold">{quotes.filter(q=>q.status==='Pending').length}</div>
+          <div className="text-xs text-gray-500 mt-1">Pending Quotes</div>
+        </div>
+        <div className="card p-4 border-l-4 border-green-400">
+          <div className="text-2xl font-bold">{quotes.filter(q=>q.status==='Approved').length}</div>
+          <div className="text-xs text-gray-500 mt-1">Approved Quotes</div>
+        </div>
+        <div className="card p-4 border-l-4 border-blue-400">
+          <div className="text-2xl font-bold">SAR {invoices.reduce((s,i)=>s+i.amount,0).toLocaleString()}</div>
+          <div className="text-xs text-gray-500 mt-1">Total Invoiced</div>
+        </div>
+        <div className="card p-4 border-l-4 border-green-400">
+          <div className="text-2xl font-bold">SAR {invoices.filter(i=>i.status==='Paid').reduce((s,i)=>s+i.amount,0).toLocaleString()}</div>
+          <div className="text-xs text-gray-500 mt-1">Collected</div>
+        </div>
+      </div>
+      <div className="flex gap-1.5 mb-4 no-print">
+        <button onClick={()=>setTab('quotes')} className={`px-3 py-1 rounded-full text-xs font-medium ${tab==='quotes'?'bg-blue-600 text-white':'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>Quotes ({quotes.length})</button>
+        <button onClick={()=>setTab('invoices')} className={`px-3 py-1 rounded-full text-xs font-medium ${tab==='invoices'?'bg-blue-600 text-white':'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>Invoices ({invoices.length})</button>
+      </div>
+      {tab==='quotes'&&(
+        <div className="card p-0 overflow-hidden">
+          <table className="w-full text-sm">
+            <thead><tr className="bg-gray-50 text-left text-gray-400 border-b text-xs">
+              <th className="px-4 py-3">Quote ID</th><th className="px-4 py-3">Job</th>
+              <th className="px-4 py-3">Client</th><th className="px-4 py-3">Contract Ref</th>
+              <th className="px-4 py-3">Total (SAR)</th><th className="px-4 py-3">Status</th><th className="px-4 py-3"></th>
+            </tr></thead>
+            <tbody>
+              {quotes.length===0&&<tr><td colSpan={7} className="px-4 py-8 text-center text-gray-400 text-sm">{t.noData}</td></tr>}
+              {quotes.map(q=>(
+                <tr key={q.id} className="tr-hover border-b last:border-0">
+                  <td className="px-4 py-3 font-mono text-blue-600 text-xs">{q.id}</td>
+                  <td className="px-4 py-3 text-xs">{jobs.find(j=>j.id===q.jobId)?.jobNumber||'—'}</td>
+                  <td className="px-4 py-3 text-sm">{q.client}</td>
+                  <td className="px-4 py-3 font-mono text-xs text-gray-400">{q.contract}</td>
+                  <td className="px-4 py-3 font-semibold">{q.total.toLocaleString()}</td>
+                  <td className="px-4 py-3"><Badge s={q.status}/></td>
+                  <td className="px-4 py-3 no-print">
+                    <div className="flex gap-1.5 flex-wrap">
+                      {q.status==='Pending'&&<button onClick={()=>approveQuote(q.id)} className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded hover:bg-green-200">Approve</button>}
+                      {q.status==='Pending'&&<button onClick={()=>rejectQuote(q.id)} className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded hover:bg-red-200">Reject</button>}
+                      {q.status==='Approved'&&!invoices.find(i=>i.quoteId===q.id)&&<button onClick={()=>genInv(q)} className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded hover:bg-blue-200">Generate Invoice</button>}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {tab==='invoices'&&(
+        <div className="card p-0 overflow-hidden">
+          <table className="w-full text-sm">
+            <thead><tr className="bg-gray-50 text-left text-gray-400 border-b text-xs">
+              <th className="px-4 py-3">Invoice ID</th><th className="px-4 py-3">Job</th>
+              <th className="px-4 py-3">Client</th><th className="px-4 py-3">Amount (SAR)</th>
+              <th className="px-4 py-3">Status</th><th className="px-4 py-3">Issued</th><th className="px-4 py-3">Due</th><th className="px-4 py-3"></th>
+            </tr></thead>
+            <tbody>
+              {invoices.length===0&&<tr><td colSpan={8} className="px-4 py-8 text-center text-gray-400 text-sm">{t.noData}</td></tr>}
+              {invoices.map(inv=>(
+                <tr key={inv.id} className="tr-hover border-b last:border-0">
+                  <td className="px-4 py-3 font-mono text-blue-600 text-xs">{inv.id}</td>
+                  <td className="px-4 py-3 text-xs">{jobs.find(j=>j.id===inv.jobId)?.jobNumber||'—'}</td>
+                  <td className="px-4 py-3 text-sm">{inv.client}</td>
+                  <td className="px-4 py-3 font-semibold">{inv.amount.toLocaleString()}</td>
+                  <td className="px-4 py-3"><Badge s={inv.status}/></td>
+                  <td className="px-4 py-3 text-xs text-gray-400">{inv.issuedDate}</td>
+                  <td className="px-4 py-3 text-xs text-gray-400">{inv.dueDate}</td>
+                  <td className="px-4 py-3 no-print">
+                    <div className="flex gap-1.5 flex-wrap">
+                      {inv.status==='Draft'&&<button onClick={()=>markSent(inv.id)} className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded hover:bg-blue-200">Mark Sent</button>}
+                      {(inv.status==='Draft'||inv.status==='Sent')&&<button onClick={()=>markPaid(inv.id)} className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded hover:bg-green-200">Mark Paid</button>}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {showQuote&&(
+        <Modal title="Create Quote" onClose={()=>setShowQuote(false)} size="lg">
+          <div className="space-y-4">
+            <div><label className="text-xs text-gray-500 block mb-1">Select Job *</label>
+              <select className="w-full border rounded-lg px-3 py-2 text-sm" value={qForm.jobId} onChange={e=>{
+                const j=jobs.find(x=>x.id===e.target.value);
+                setQForm({...qForm, jobId:e.target.value});
+              }}>
+                <option value="">— Select Job —</option>
+                {nonClosedJobs.map(j=><option key={j.id} value={j.id}>{j.jobNumber} · {j.well} · {j.client}</option>)}
+              </select>
+            </div>
+            <div><label className="text-xs text-gray-500 block mb-1">Contract Reference</label>
+              <input type="text" placeholder="CTR-2026-001 (auto-generated if blank)" value={qForm.contract} onChange={e=>setQForm({...qForm, contract:e.target.value})} className="w-full border rounded-lg px-3 py-2 text-sm"/>
+            </div>
+            <div><label className="text-xs text-gray-500 block mb-1">Total Amount (SAR) *</label>
+              <input type="number" placeholder="0.00" value={qForm.total} onChange={e=>setQForm({...qForm, total:e.target.value})} className="w-full border rounded-lg px-3 py-2 text-sm"/>
+            </div>
+            <div><label className="text-xs text-gray-500 block mb-1">Description</label>
+              <textarea placeholder="Quote description / scope of work" value={qForm.description} onChange={e=>setQForm({...qForm, description:e.target.value})} className="w-full border rounded-lg px-3 py-2 text-sm h-20"/>
+            </div>
+            <div className="flex gap-2 justify-end pt-2">
+              <button onClick={()=>setShowQuote(false)} className="px-4 py-2 text-sm border rounded-lg">{t.cancel}</button>
+              <button onClick={createQuote} disabled={!qForm.jobId||!qForm.total} className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg disabled:opacity-40">{t.save}</button>
+            </div>
+          </div>
+        </Modal>
+      )}
+      {showInvoice&&(
+        <Modal title="Create Invoice" onClose={()=>setShowInvoice(false)} size="lg">
+          <div className="space-y-4">
+            <div><label className="text-xs text-gray-500 block mb-1">Select Job *</label>
+              <select className="w-full border rounded-lg px-3 py-2 text-sm" value={iForm.jobId} onChange={e=>setIForm({...iForm, jobId:e.target.value})}>
+                <option value="">— Select Job —</option>
+                {nonClosedJobs.map(j=><option key={j.id} value={j.id}>{j.jobNumber} · {j.well} · {j.client}</option>)}
+              </select>
+            </div>
+            <div><label className="text-xs text-gray-500 block mb-1">Amount (SAR) *</label>
+              <input type="number" placeholder="0.00" value={iForm.amount} onChange={e=>setIForm({...iForm, amount:e.target.value})} className="w-full border rounded-lg px-3 py-2 text-sm"/>
+            </div>
+            <div><label className="text-xs text-gray-500 block mb-1">Description</label>
+              <textarea placeholder="Invoice description" value={iForm.description} onChange={e=>setIForm({...iForm, description:e.target.value})} className="w-full border rounded-lg px-3 py-2 text-sm h-20"/>
+            </div>
+            <div className="flex gap-2 justify-end pt-2">
+              <button onClick={()=>setShowInvoice(false)} className="px-4 py-2 text-sm border rounded-lg">{t.cancel}</button>
+              <button onClick={createDirectInvoice} disabled={!iForm.jobId||!iForm.amount} className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg disabled:opacity-40">{t.save}</button>
+            </div>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+};
+
+// ─── KPI DASHBOARD ──────────────────────────────────────────
+const KPI = () => {
+  const {jobs, assets, inspections, workOrders, lang} = useContext(Ctx);
+  const t = T[lang];
+  const inJob = assets.filter(a=>a.status==='In Job').length;
+  const util = Math.round((inJob/assets.length)*100);
+  const totalNPT = jobs.reduce((s,j)=>s+j.nptEvents.reduce((x,e)=>x+e.hours,0),0);
+  const totalHours = assets.reduce((s,a)=>s+a.hours,0);
+  const scrapped = inspections.filter(i=>i.result==='Scrap').length;
+  const mtbf = scrapped>0 ? Math.round(totalHours/scrapped) : totalHours;
+
+  const rows = [
+    {metric:'Tool Utilization Rate', category:'Fleet', val:`${util}%`, target:'≥ 70%', ok:util>=70},
+    {metric:'NPT (Non-Productive Time)', category:'Operational', val:`${totalNPT}h`, target:'< 5h / job', ok:totalNPT<=10},
+    {metric:'Total Tool Operating Hours', category:'Fleet', val:`${totalHours}h`, target:null, ok:null},
+    {metric:'MTBF (Mean Time Between Failures)', category:'Reliability', val:`${mtbf}h`, target:'> 300h', ok:mtbf>=300},
+    {metric:'Tools in Redress / Quarantine', category:'Fleet', val:`${assets.filter(a=>['Redress','Quarantine'].includes(a.status)).length}`, target:'< 3', ok:assets.filter(a=>['Redress','Quarantine'].includes(a.status)).length<3},
+    {metric:'Open Work Orders', category:'Maintenance', val:`${workOrders.filter(w=>w.status!=='Closed').length}`, target:'< 5', ok:workOrders.filter(w=>w.status!=='Closed').length<5},
+    {metric:'Scrapped Tools (Lifecycle)', category:'Fleet', val:`${assets.filter(a=>a.status==='Scrap').length}`, target:'< 2', ok:assets.filter(a=>a.status==='Scrap').length<2},
+    {metric:'Jobs Completed / Closed', category:'Operational', val:`${jobs.filter(j=>['Completed','Closed'].includes(j.status)).length}`, target:null, ok:null},
+  ];
+
+  const nptJobs = jobs.filter(j=>j.nptEvents.length>0);
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-5">
+        <h1 className="text-2xl font-bold text-gray-800">{t.kpi}</h1>
+        <ExportBar title="KPI" data={rows} />
+      </div>
+      <div className="card mb-5">
+        <h2 className="font-semibold text-gray-700 mb-4 text-sm">Key Performance Indicators</h2>
+        <table className="w-full text-sm">
+          <thead><tr className="text-left text-gray-400 border-b text-xs"><th className="pb-2">Metric</th><th className="pb-2">Category</th><th className="pb-2">Value</th><th className="pb-2">Target</th><th className="pb-2">Health</th></tr></thead>
+          <tbody>
+            {rows.map((r,i)=>(
+              <tr key={i} className="tr-hover border-b last:border-0">
+                <td className="py-2.5 font-medium text-sm">{r.metric}</td>
+                <td className="py-2.5"><span className="text-xs bg-gray-100 px-2 py-0.5 rounded text-gray-600">{r.category}</span></td>
+                <td className="py-2.5 font-mono font-bold text-base">{r.val}</td>
+                <td className="py-2.5 text-xs text-gray-400">{r.target||'—'}</td>
+                <td className="py-2.5">{r.ok===null?'—':r.ok?<Badge s="Accept"/>:<Badge s="Quarantine"/>}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {nptJobs.length>0&&(
+        <div className="card">
+          <h2 className="font-semibold text-gray-700 mb-4 text-sm">NPT Events by Job</h2>
+          {nptJobs.map((j,i)=>{
+            const h = j.nptEvents.reduce((s,e)=>s+e.hours,0);
+            return (
+              <div key={i} className="flex items-center gap-4 py-2.5 border-b last:border-0 text-sm">
+                <div className="flex-1">
+                  <div className="font-mono text-xs text-blue-600">{j.jobNumber}</div>
+                  <div className="text-gray-500 text-xs mt-0.5">{j.nptEvents.map(e=>e.reason).join(', ')}</div>
+                </div>
+                <div className="font-bold text-red-600 w-20 text-right">{h}h NPT</div>
+                <div className="w-28 bg-gray-100 rounded-full h-2">
+                  <div className="h-2 bg-red-400 rounded-full" style={{width:`${Math.min(100,(h/15)*100)}%`}}/>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ─── GOVERNANCE ─────────────────────────────────────────────
+const Governance = () => {
+  const {approvals, setApprovals, jobs, users, lang} = useContext(Ctx);
+  const t = T[lang];
+  const [filter, setFilter] = useState('Pending');
+  const [show, setShow] = useState(false);
+  const [detail, setDetail] = useState(null);
+  const [form, setForm] = useState({type:'Tool Purchase', description:'', risk:'Medium', requestedBy:'', approver:'', jobRef:'', amount:'', justification:''});
+
+  const approvalTypes = ['Tool Purchase', 'Tool Write-Off', 'Budget Override', 'Contract Amendment', 'Safety Exception', 'Resource Allocation', 'Scope Change', 'Emergency Procurement'];
+
+  const list = filter==='All' ? approvals : approvals.filter(a=>a.status===filter);
+
+  const createApproval = () => {
+    if(!form.description || !form.requestedBy) return;
+    const ap = {
+      id:'AP'+String(approvals.length+1).padStart(3,'0'),
+      type:form.type,
+      description:form.description,
+      risk:form.risk,
+      status:'Pending',
+      requestedBy:form.requestedBy,
+      approver:form.approver||'Management',
+      requestedDate:new Date().toISOString().slice(0,10),
+      jobRef:form.jobRef,
+      amount:form.amount ? parseFloat(form.amount) : null,
+      justification:form.justification,
+      comments:[]
+    };
+    setApprovals([...approvals, ap]);
+    setForm({type:'Tool Purchase', description:'', risk:'Medium', requestedBy:'', approver:'', jobRef:'', amount:'', justification:''});
+    setShow(false);
+  };
+
+  const act = (id, status, comment) => {
+    setApprovals(approvals.map(a=>{
+      if(a.id===id) {
+        const updated = {...a, status, decidedDate:new Date().toISOString().slice(0,10)};
+        if(comment) updated.comments = [...(a.comments||[]), {text:comment, date:new Date().toISOString().slice(0,10), by:'Approver'}];
+        if(detail && detail.id===id) setDetail(updated);
+        return updated;
+      }
+      return a;
+    }));
+  };
+
+  const addComment = (id, text) => {
+    if(!text) return;
+    setApprovals(approvals.map(a=>{
+      if(a.id===id) {
+        const updated = {...a, comments:[...(a.comments||[]), {text, date:new Date().toISOString().slice(0,10), by:'User'}]};
+        if(detail && detail.id===id) setDetail(updated);
+        return updated;
+      }
+      return a;
+    }));
+  };
+
+  const [commentText, setCommentText] = useState('');
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-5">
+        <h1 className="text-2xl font-bold text-gray-800">{t.governance}</h1>
+        <div className="flex items-center gap-3">
+          <ExportBar title="Governance" data={list} />
+          <button onClick={()=>setShow(true)} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 no-print">+ New Approval Request</button>
+        </div>
+      </div>
+      <div className="grid grid-cols-3 gap-4 mb-5">
+        <div className="card border-l-4 border-yellow-400 p-4"><div className="text-3xl font-bold">{approvals.filter(a=>a.status==='Pending').length}</div><div className="text-sm text-gray-500 mt-1">Pending</div></div>
+        <div className="card border-l-4 border-green-400 p-4"><div className="text-3xl font-bold">{approvals.filter(a=>a.status==='Approved').length}</div><div className="text-sm text-gray-500 mt-1">Approved</div></div>
+        <div className="card border-l-4 border-red-400 p-4"><div className="text-3xl font-bold">{approvals.filter(a=>a.status==='Rejected').length}</div><div className="text-sm text-gray-500 mt-1">Rejected</div></div>
+      </div>
+      <div className="flex gap-1.5 mb-4 no-print">
+        {['All','Pending','Approved','Rejected'].map(s=><button key={s} onClick={()=>setFilter(s)} className={`px-3 py-1 rounded-full text-xs font-medium ${filter===s?'bg-blue-600 text-white':'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>{s} ({s==='All'?approvals.length:approvals.filter(a=>a.status===s).length})</button>)}
+      </div>
+      <div className="space-y-3">
+        {list.length===0&&<div className="text-center py-8 text-gray-400 text-sm">{t.noData}</div>}
+        {list.map(ap=>(
+          <div key={ap.id} onClick={()=>setDetail(ap)} className={`card border-l-4 ${ap.status==='Pending'?'border-yellow-400':ap.status==='Approved'?'border-green-400':'border-red-400'} p-4 cursor-pointer hover:shadow-md transition-shadow`}>
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                  <span className="font-mono text-xs text-blue-600">{ap.id}</span>
+                  <span className="text-xs bg-gray-100 px-2 py-0.5 rounded font-medium text-gray-700">{ap.type}</span>
+                  <Badge s={ap.risk}/>
+                  <Badge s={ap.status}/>
+                </div>
+                <div className="font-medium text-gray-800 text-sm">{ap.description}</div>
+                <div className="text-xs text-gray-400 mt-1">Requested by: {ap.requestedBy} · {ap.requestedDate}{ap.approver ? ` · Approver: ${ap.approver}` : ''}</div>
+                {ap.jobRef&&<div className="text-xs text-blue-500 mt-0.5">Job: {ap.jobRef}</div>}
+                {ap.amount&&<div className="text-xs text-gray-500 mt-0.5">Amount: SAR {ap.amount.toLocaleString()}</div>}
+              </div>
+              <div className="flex items-center gap-2 ml-4 flex-shrink-0 no-print">
+                {ap.status==='Pending'&&(
+                  <>
+                    <button onClick={(e)=>{e.stopPropagation();act(ap.id,'Approved')}} className="px-3 py-1.5 bg-green-600 text-white rounded-lg text-xs font-medium hover:bg-green-700">{t.approve}</button>
+                    <button onClick={(e)=>{e.stopPropagation();act(ap.id,'Rejected')}} className="px-3 py-1.5 bg-red-100 text-red-700 rounded-lg text-xs font-medium hover:bg-red-200">{t.reject}</button>
+                  </>
+                )}
+                <span className="text-blue-400 text-xs">View →</span>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+      {/* Detail Modal */}
+      {detail&&(
+        <Modal title={`Approval Request — ${detail.id}`} onClose={()=>{setDetail(null);setCommentText('')}} size="lg">
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div><div className="text-xs text-gray-400 mb-1">Request ID</div><div className="font-mono text-blue-600 text-sm">{detail.id}</div></div>
+              <div><div className="text-xs text-gray-400 mb-1">Type</div><div className="text-sm font-medium">{detail.type}</div></div>
+              <div><div className="text-xs text-gray-400 mb-1">Risk Level</div><div><Badge s={detail.risk}/></div></div>
+              <div><div className="text-xs text-gray-400 mb-1">Status</div><div><Badge s={detail.status}/></div></div>
+              <div><div className="text-xs text-gray-400 mb-1">Requested By</div><div className="text-sm">{detail.requestedBy}</div></div>
+              <div><div className="text-xs text-gray-400 mb-1">Approver</div><div className="text-sm">{detail.approver||'Management'}</div></div>
+              <div><div className="text-xs text-gray-400 mb-1">Request Date</div><div className="text-sm">{detail.requestedDate}</div></div>
+              {detail.decidedDate&&<div><div className="text-xs text-gray-400 mb-1">Decision Date</div><div className="text-sm">{detail.decidedDate}</div></div>}
+            </div>
+            <div><div className="text-xs text-gray-400 mb-1">Description</div><div className="text-sm bg-gray-50 rounded-lg p-3">{detail.description}</div></div>
+            {detail.justification&&<div><div className="text-xs text-gray-400 mb-1">Justification</div><div className="text-sm bg-gray-50 rounded-lg p-3">{detail.justification}</div></div>}
+            {detail.jobRef&&<div><div className="text-xs text-gray-400 mb-1">Related Job</div><div className="text-sm text-blue-600">{detail.jobRef}</div></div>}
+            {detail.amount&&<div><div className="text-xs text-gray-400 mb-1">Amount</div><div className="text-sm font-semibold">SAR {detail.amount.toLocaleString()}</div></div>}
+            {/* Comments */}
+            <div>
+              <div className="text-xs font-medium text-gray-700 mb-2">Comments ({(detail.comments||[]).length})</div>
+              <div className="border rounded-lg overflow-hidden">
+                {(detail.comments||[]).length===0&&<div className="p-3 text-xs text-gray-400 text-center">No comments yet</div>}
+                {(detail.comments||[]).map((c,i)=>(
+                  <div key={i} className="p-3 border-b last:border-0 bg-gray-50">
+                    <div className="text-sm">{c.text}</div>
+                    <div className="text-xs text-gray-400 mt-1">{c.by} · {c.date}</div>
+                  </div>
+                ))}
+              </div>
+              <div className="flex gap-2 mt-2">
+                <input type="text" placeholder="Add a comment..." value={commentText} onChange={e=>setCommentText(e.target.value)} className="flex-1 border rounded-lg px-3 py-2 text-sm" onKeyDown={e=>{if(e.key==='Enter'){addComment(detail.id,commentText);setCommentText('')}}}/>
+                <button onClick={()=>{addComment(detail.id,commentText);setCommentText('')}} disabled={!commentText} className="px-3 py-2 text-sm bg-gray-100 rounded-lg hover:bg-gray-200 disabled:opacity-40">Post</button>
+              </div>
+            </div>
+            {/* Actions */}
+            {detail.status==='Pending'&&(
+              <div className="flex gap-2 pt-2 border-t">
+                <button onClick={()=>act(detail.id,'Approved')} className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700">{t.approve}</button>
+                <button onClick={()=>act(detail.id,'Rejected')} className="px-4 py-2 bg-red-100 text-red-700 rounded-lg text-sm font-medium hover:bg-red-200">{t.reject}</button>
+              </div>
+            )}
+            <div className="flex justify-end">
+              <button onClick={()=>{setDetail(null);setCommentText('')}} className="px-4 py-2 text-sm border rounded-lg">Close</button>
+            </div>
+          </div>
+        </Modal>
+      )}
+      {/* Create Approval Request Modal */}
+      {show&&(
+        <Modal title="New Approval Request" onClose={()=>setShow(false)} size="lg">
+          <div className="space-y-4">
+            <div><label className="text-xs text-gray-500 block mb-1">Request Type *</label>
+              <select value={form.type} onChange={e=>setForm({...form, type:e.target.value})} className="w-full border rounded-lg px-3 py-2 text-sm">
+                {approvalTypes.map(at=><option key={at} value={at}>{at}</option>)}
+              </select>
+            </div>
+            <div><label className="text-xs text-gray-500 block mb-1">Description *</label>
+              <textarea placeholder="Describe what needs to be approved..." value={form.description} onChange={e=>setForm({...form, description:e.target.value})} className="w-full border rounded-lg px-3 py-2 text-sm h-20"/>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div><label className="text-xs text-gray-500 block mb-1">Risk Level *</label>
+                <select value={form.risk} onChange={e=>setForm({...form, risk:e.target.value})} className="w-full border rounded-lg px-3 py-2 text-sm">
+                  <option>Low</option><option>Medium</option><option>High</option>
+                </select>
+              </div>
+              <div><label className="text-xs text-gray-500 block mb-1">Amount (SAR)</label>
+                <input type="number" placeholder="0.00" value={form.amount} onChange={e=>setForm({...form, amount:e.target.value})} className="w-full border rounded-lg px-3 py-2 text-sm"/>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div><label className="text-xs text-gray-500 block mb-1">Requested By *</label>
+                <select value={form.requestedBy} onChange={e=>setForm({...form, requestedBy:e.target.value})} className="w-full border rounded-lg px-3 py-2 text-sm">
+                  <option value="">— Select Requester —</option>
+                  {users.filter(u=>u.status==='Active').map(u=><option key={u.id} value={u.name}>{u.name} ({u.role})</option>)}
+                </select>
+              </div>
+              <div><label className="text-xs text-gray-500 block mb-1">Approver</label>
+                <select value={form.approver} onChange={e=>setForm({...form, approver:e.target.value})} className="w-full border rounded-lg px-3 py-2 text-sm">
+                  <option value="">— Auto-assign (Management) —</option>
+                  {users.filter(u=>u.status==='Active'&&(u.role==='Admin'||u.role==='Manager')).map(u=><option key={u.id} value={u.name}>{u.name} ({u.role})</option>)}
+                </select>
+              </div>
+            </div>
+            <div><label className="text-xs text-gray-500 block mb-1">Related Job</label>
+              <select value={form.jobRef} onChange={e=>setForm({...form, jobRef:e.target.value})} className="w-full border rounded-lg px-3 py-2 text-sm">
+                <option value="">— None —</option>
+                {jobs.map(j=><option key={j.id} value={j.jobNumber}>{j.jobNumber} · {j.well} · {j.client}</option>)}
+              </select>
+            </div>
+            <div><label className="text-xs text-gray-500 block mb-1">Business Justification</label>
+              <textarea placeholder="Why is this approval needed?" value={form.justification} onChange={e=>setForm({...form, justification:e.target.value})} className="w-full border rounded-lg px-3 py-2 text-sm h-16"/>
+            </div>
+            <div className="flex gap-2 justify-end pt-2">
+              <button onClick={()=>setShow(false)} className="px-4 py-2 text-sm border rounded-lg">{t.cancel}</button>
+              <button onClick={createApproval} disabled={!form.description||!form.requestedBy} className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg disabled:opacity-40">Submit Request</button>
+            </div>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+};
+
+// ─── USER MANAGEMENT ────────────────────────────────────────
+const UserManagement = () => {
+  const {users, setUsers, lang} = useContext(Ctx);
+  const t = T[lang];
+  const [show, setShow] = useState(false);
+  const [editId, setEditId] = useState(null);
+  const [form, setForm] = useState({name:'', email:'', role:'Manager', status:'Active', pageAccess:[]});
+
+  const pageOptions = [
+    {key:'dashboard', label:'Dashboard'},
+    {key:'jobs', label:'Jobs'},
+    {key:'serviceDelivery', label:'Service Delivery'},
+    {key:'backload', label:'Backload'},
+    {key:'assets', label:'Assets'},
+    {key:'inspection', label:'Inspection'},
+    {key:'maintenance', label:'Maintenance'},
+    {key:'q2c', label:'Quote to Cash'},
+    {key:'kpi', label:'KPI'},
+    {key:'governance', label:'Governance'},
+    {key:'users', label:'Users'},
+    {key:'assetMgmt', label:'Asset Management'},
+  ];
+
+  const openCreate = () => {
+    setEditId(null);
+    setForm({name:'', email:'', role:'Manager', status:'Active', pageAccess:[]});
+    setShow(true);
+  };
+
+  const openEdit = (user) => {
+    setEditId(user.id);
+    setForm({name:user.name, email:user.email, role:user.role, status:user.status, pageAccess:user.pageAccess});
+    setShow(true);
+  };
+
+  const togglePage = (key) => {
+    setForm({...form, pageAccess:form.pageAccess.includes(key)?form.pageAccess.filter(p=>p!==key):[...form.pageAccess,key]});
+  };
+
+  const save = () => {
+    if(form.name && form.email) {
+      if(editId) {
+        setUsers(users.map(u=>u.id===editId?{...u, ...form}:u));
+      } else {
+        setUsers([...users, {id:'U'+(Math.random()*9000+1000|0), ...form}]);
+      }
+      setShow(false);
+      setForm({name:'', email:'', role:'Manager', status:'Active', pageAccess:[]});
+    }
+  };
+
+  const toggleStatus = (userId) => {
+    setUsers(users.map(u=>u.id===userId?{...u, status:u.status==='Active'?'Inactive':'Active'}:u));
+  };
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-5">
+        <h1 className="text-2xl font-bold text-gray-800">{t.users}</h1>
+        <div className="flex items-center gap-3">
+          <ExportBar title="Users" data={users} />
+          <button onClick={openCreate} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 no-print">+ {t.createUser}</button>
+        </div>
+      </div>
+      <div className="card p-0 overflow-hidden">
+        <table className="w-full text-sm">
+          <thead><tr className="bg-gray-50 text-left text-gray-400 border-b text-xs">
+            <th className="px-4 py-3">Name</th><th className="px-4 py-3">Email</th><th className="px-4 py-3">Role</th>
+            <th className="px-4 py-3">Status</th><th className="px-4 py-3">Pages</th><th className="px-4 py-3"></th>
+          </tr></thead>
+          <tbody>
+            {users.length===0&&<tr><td colSpan={6} className="px-4 py-8 text-center text-gray-400 text-sm">{t.noData}</td></tr>}
+            {users.map(u=>(
+              <tr key={u.id} className="tr-hover border-b last:border-0">
+                <td className="px-4 py-3 font-medium text-sm">{u.name}</td>
+                <td className="px-4 py-3 text-xs text-gray-500">{u.email}</td>
+                <td className="px-4 py-3 text-xs"><span className="bg-gray-100 px-2 py-1 rounded">{u.role}</span></td>
+                <td className="px-4 py-3"><Badge s={u.status}/></td>
+                <td className="px-4 py-3 text-xs text-gray-500">{u.pageAccess.length} pages</td>
+                <td className="px-4 py-3 flex gap-2 no-print">
+                  <button onClick={()=>openEdit(u)} className="text-blue-600 text-xs hover:underline">Edit</button>
+                  <button onClick={()=>toggleStatus(u.id)} className="text-xs px-2 py-1 rounded border border-gray-300 hover:bg-gray-100">{u.status==='Active'?'Deactivate':'Activate'}</button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {show&&(
+        <Modal title={editId?'Edit User':t.createUser} onClose={()=>setShow(false)} size="lg">
+          <div className="space-y-4">
+            <input type="text" placeholder="Name" value={form.name} onChange={e=>setForm({...form, name:e.target.value})} className="w-full border rounded-lg px-3 py-2 text-sm"/>
+            <input type="email" placeholder="Email" value={form.email} onChange={e=>setForm({...form, email:e.target.value})} className="w-full border rounded-lg px-3 py-2 text-sm"/>
+            <select value={form.role} onChange={e=>setForm({...form, role:e.target.value})} className="w-full border rounded-lg px-3 py-2 text-sm">
+              <option>Admin</option><option>Manager</option><option>Engineer</option><option>Viewer</option>
+            </select>
+            <div className="flex items-center gap-2">
+              <input type="checkbox" id="status" checked={form.status==='Active'} onChange={e=>setForm({...form, status:e.target.checked?'Active':'Inactive'})} className="rounded"/>
+              <label htmlFor="status" className="text-sm font-medium">{form.status==='Active'?'Active':'Inactive'}</label>
+            </div>
+            <div><label className="text-xs font-medium text-gray-700 block mb-2">Page Access</label>
+              <div className="border rounded-lg p-3 max-h-48 overflow-y-auto grid grid-cols-2 gap-2">
+                {pageOptions.map(p=>(
+                  <label key={p.key} className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" checked={form.pageAccess.includes(p.key)} onChange={()=>togglePage(p.key)} className="rounded"/>
+                    <span className="text-xs text-gray-700">{p.label}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div className="flex gap-2 justify-end pt-2">
+              <button onClick={()=>setShow(false)} className="px-4 py-2 text-sm border rounded-lg">{t.cancel}</button>
+              <button onClick={save} className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg">{t.save}</button>
+            </div>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+};
+
+// ─── ASSET MANAGEMENT ───────────────────────────────────────
+const AssetManagement = () => {
+  const {assets, setAssets, lang} = useContext(Ctx);
+  const t = T[lang];
+  const [show, setShow] = useState(false);
+  const [editId, setEditId] = useState(null);
+  const [filter, setFilter] = useState('all');
+  const [historyAsset, setHistoryAsset] = useState(null);
+  const [form, setForm] = useState({serial:'', type:'', productLine:'', status:'Available', runs:0, hours:0, nextMaintAt:'', active:true});
+
+  const assetTypes = ['Mud Cleaner', 'Centrifuge', 'Shale Shaker', 'Solids Control', 'Mud Tank', 'Chiller Unit'];
+  const productLines = ['PC500', 'RF200', 'SS-250', 'SC-400', 'MT-100', 'CU-50'];
+
+  const filteredAssets = filter==='all' ? assets : filter==='active' ? assets.filter(a=>a.active) : assets.filter(a=>!a.active);
+
+  const openCreate = () => {
+    setEditId(null);
+    setForm({serial:'', type:'', productLine:'', status:'Available', runs:0, hours:0, nextMaintAt:'', active:true});
+    setShow(true);
+  };
+
+  const openEdit = (asset) => {
+    setEditId(asset.id);
+    setForm({...asset});
+    setShow(true);
+  };
+
+  const save = () => {
+    if(form.serial && form.type && form.productLine) {
+      if(editId) {
+        setAssets(assets.map(a=>a.id===editId?{...a, ...form}:a));
+      } else {
+        setAssets([...assets, {id:'A'+(Math.random()*8999+1000|0), ...form, assignedTo:null, history:[]}]);
+      }
+      setShow(false);
+      setForm({serial:'', type:'', productLine:'', status:'Available', runs:0, hours:0, nextMaintAt:'', active:true});
+    }
+  };
+
+  const toggleActive = (assetId) => {
+    setAssets(assets.map(a=>a.id===assetId?{...a, active:!a.active}:a));
+  };
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-5">
+        <h1 className="text-2xl font-bold text-gray-800">{t.assetMgmt}</h1>
+        <div className="flex items-center gap-3">
+          <ExportBar title="AssetManagement" data={filteredAssets} />
+          <button onClick={openCreate} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 no-print">+ {t.addAsset}</button>
+        </div>
+      </div>
+      <div className="flex gap-1.5 mb-4 no-print">
+        <button onClick={()=>setFilter('all')} className={`px-3 py-1 rounded-full text-xs font-medium ${filter==='all'?'bg-blue-600 text-white':'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>All</button>
+        <button onClick={()=>setFilter('active')} className={`px-3 py-1 rounded-full text-xs font-medium ${filter==='active'?'bg-blue-600 text-white':'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>Active</button>
+        <button onClick={()=>setFilter('inactive')} className={`px-3 py-1 rounded-full text-xs font-medium ${filter==='inactive'?'bg-blue-600 text-white':'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>Inactive</button>
+      </div>
+      <div className="card p-0 overflow-hidden">
+        <table className="w-full text-sm">
+          <thead><tr className="bg-gray-50 text-left text-gray-400 border-b text-xs">
+            <th className="px-4 py-3">Serial</th><th className="px-4 py-3">Type</th><th className="px-4 py-3">Product Line</th>
+            <th className="px-4 py-3">Status</th><th className="px-4 py-3">Assigned To</th><th className="px-4 py-3">Runs</th>
+            <th className="px-4 py-3">Hours</th><th className="px-4 py-3">Active</th><th className="px-4 py-3"></th>
+          </tr></thead>
+          <tbody>
+            {filteredAssets.length===0&&<tr><td colSpan={9} className="px-4 py-8 text-center text-gray-400 text-sm">{t.noData}</td></tr>}
+            {filteredAssets.map(a=>(
+              <tr key={a.id} className="tr-hover border-b last:border-0">
+                <td className="px-4 py-3 font-mono text-blue-600 text-xs">{a.serial}</td>
+                <td className="px-4 py-3 text-sm">{a.type}</td>
+                <td className="px-4 py-3 text-xs text-gray-500">{a.productLine}</td>
+                <td className="px-4 py-3"><Badge s={a.status}/></td>
+                <td className="px-4 py-3 text-sm">{a.assignedTo || '—'}</td>
+                <td className="px-4 py-3 text-sm">{a.runs}</td>
+                <td className="px-4 py-3 text-sm font-mono">{a.hours}</td>
+                <td className="px-4 py-3"><Badge s={a.active?'Active':'Inactive'}/></td>
+                <td className="px-4 py-3 flex gap-2 no-print">
+                  <button onClick={()=>openEdit(a)} className="text-blue-600 text-xs hover:underline">Edit</button>
+                  <button onClick={()=>setHistoryAsset(a)} className="text-blue-600 text-xs hover:underline">History</button>
+                  <button onClick={()=>toggleActive(a.id)} className="text-xs px-2 py-1 rounded border border-gray-300 hover:bg-gray-100">{a.active?'Deactivate':'Activate'}</button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {show&&(
+        <Modal title={editId?'Edit Asset':t.addAsset} onClose={()=>setShow(false)}>
+          <div className="space-y-4">
+            <input type="text" placeholder="Serial Number" value={form.serial} onChange={e=>setForm({...form, serial:e.target.value})} className="w-full border rounded-lg px-3 py-2 text-sm"/>
+            <select value={form.type} onChange={e=>setForm({...form, type:e.target.value})} className="w-full border rounded-lg px-3 py-2 text-sm">
+              <option value="">— Select Type —</option>
+              {assetTypes.map(t=><option key={t} value={t}>{t}</option>)}
+            </select>
+            <select value={form.productLine} onChange={e=>setForm({...form, productLine:e.target.value})} className="w-full border rounded-lg px-3 py-2 text-sm">
+              <option value="">— Select Product Line —</option>
+              {productLines.map(p=><option key={p} value={p}>{p}</option>)}
+            </select>
+            <select value={form.status} onChange={e=>setForm({...form, status:e.target.value})} className="w-full border rounded-lg px-3 py-2 text-sm">
+              <option>Available</option><option>In Job</option><option>Redress</option><option>Quarantine</option><option>Scrap</option>
+            </select>
+            <input type="number" placeholder="Runs" value={form.runs} onChange={e=>setForm({...form, runs:parseInt(e.target.value)||0})} className="w-full border rounded-lg px-3 py-2 text-sm"/>
+            <input type="number" placeholder="Hours" value={form.hours} onChange={e=>setForm({...form, hours:parseInt(e.target.value)||0})} className="w-full border rounded-lg px-3 py-2 text-sm"/>
+            <input type="date" placeholder="Next Maintenance" value={form.nextMaintAt} onChange={e=>setForm({...form, nextMaintAt:e.target.value})} className="w-full border rounded-lg px-3 py-2 text-sm"/>
+            <div className="flex items-center gap-2">
+              <input type="checkbox" id="active" checked={form.active} onChange={e=>setForm({...form, active:e.target.checked})} className="rounded"/>
+              <label htmlFor="active" className="text-sm font-medium">Active</label>
+            </div>
+            <div className="flex gap-2 justify-end pt-2">
+              <button onClick={()=>setShow(false)} className="px-4 py-2 text-sm border rounded-lg">{t.cancel}</button>
+              <button onClick={save} className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg">{t.save}</button>
+            </div>
+          </div>
+        </Modal>
+      )}
+      {historyAsset && <AssetHistoryModal asset={historyAsset} onClose={() => setHistoryAsset(null)} />}
+    </div>
+  );
+};
+
+// ─── APP ROOT ─────────────────────────────────────────────────
+const App = () => {
+  const [lang, setLang] = useState('en');
+  const [page, setPage] = useState('dashboard');
+  const [jobs, setJobs] = useState(initJobs);
+  const [assets, setAssets] = useState(initAssets);
+  const [wells, setWells] = useState(initWells);
+  const [clients, setClients] = useState(initClients);
+  const [tickets, setTickets] = useState(initTickets);
+  const [backloads, setBackloads] = useState(initBackloads);
+  const [inspections, setInspections] = useState(initInspections);
+  const [workOrders, setWorkOrders] = useState(initWorkOrders);
+  const [quotes, setQuotes] = useState(initQuotes);
+  const [invoices, setInvoices] = useState(initInvoices);
+  const [approvals, setApprovals] = useState(initApprovals);
+  const [users, setUsers] = useState(initUsers);
+
+  const ctx = {lang, page, setPage, jobs, setJobs, assets, setAssets, wells, setWells, clients, setClients, tickets, setTickets, backloads, setBackloads, inspections, setInspections, workOrders, setWorkOrders, quotes, setQuotes, invoices, setInvoices, approvals, setApprovals, users, setUsers};
+
+  const pages = {dashboard:Dashboard, jobs:Jobs, serviceDelivery:ServiceDelivery, backload:Backload, assets:Assets, inspection:Inspection, maintenance:Maintenance, q2c:Q2C, kpi:KPI, governance:Governance, users:UserManagement, assetMgmt:AssetManagement};
+  const Page = pages[page] || Dashboard;
+
+  return (
+    <Ctx.Provider value={ctx}>
+      <div dir={lang==='ar'?'rtl':'ltr'} style={{display:'flex', minHeight:'100vh'}}>
+        <Sidebar page={page} setPage={setPage} lang={lang} setLang={setLang}/>
+        <main style={{flex:1, padding:'24px', overflowY:'auto'}}>
+          <Page/>
+        </main>
+      </div>
+    </Ctx.Provider>
+  );
+};
+
+ReactDOM.render(<App/>, document.getElementById('root'));
+</script>
+</body>
+</html>
